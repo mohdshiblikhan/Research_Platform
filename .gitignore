@@ -1,0 +1,23 @@
+# Environments
+.venv
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Testing
+.pytest_cache/
+.coverage
+
+# Data
+data/
+
+# OS
+.DS_Store
+
+# Agent Files
+agents.md
+milestone.md

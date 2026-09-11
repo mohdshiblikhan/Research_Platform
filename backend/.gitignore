@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# pytest
+.pytest_cache/
+
+# Alembic pycache
+alembic/__pycache__/
+alembic/versions/__pycache__/
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
