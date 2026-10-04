@@ -96,3 +96,38 @@ def test_upload_dir(tmp_path):
     settings.upload_dir = str(tmp_path / "uploads")
     yield settings.upload_dir
     settings.upload_dir = original_upload_dir
+
+
+# ── Processing Test Fixtures ───────────────────────────────────────────────
+
+@pytest.fixture(scope="session")
+def sample_multipage_pdf_bytes():
+    """Generate a 3-page PDF with known text content on each page.
+
+    Page 1: "Page one content. This is the first page of the research paper."
+    Page 2: "Page two content. This is the second page with methodology details."
+    Page 3: "Page three content. This is the third page with experimental results."
+
+    Created once per test session.
+    """
+    page_texts = [
+        "Page one content. This is the first page of the research paper.",
+        "Page two content. This is the second page with methodology details.",
+        "Page three content. This is the third page with experimental results.",
+    ]
+
+    doc = pymupdf.open()
+    for text in page_texts:
+        page = doc.new_page(width=612, height=792)
+        page.insert_text((72, 72), text)
+    pdf_bytes = doc.tobytes()
+    doc.close()
+    return pdf_bytes
+
+
+@pytest.fixture(scope="function")
+def sample_multipage_pdf(sample_multipage_pdf_bytes):
+    """Return a tuple of (filename, file-like bytes, content_type) for a 3-page PDF."""
+    import io
+    return ("multipage_paper.pdf", io.BytesIO(sample_multipage_pdf_bytes), "application/pdf")
+
