@@ -1,8 +1,9 @@
 from fastapi import APIRouter
 
-from app.api.endpoints import projects, documents
+from app.api.endpoints import projects, documents, processing
 
 router = APIRouter()
 
 router.include_router(projects.router)
 router.include_router(documents.router)
+router.include_router(processing.router)
