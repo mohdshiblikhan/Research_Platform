@@ -60,3 +60,14 @@ class DocumentRepository:
         """Delete a document row."""
         self.db.delete(document)
         self.db.commit()
+
+    def update_status(self, document: Document, status: str) -> Document:
+        """Update a document's processing status.
+
+        Uses flush() instead of commit() so the caller can control the
+        transaction boundary (e.g., commit status + chunks atomically).
+        """
+        document.status = status
+        self.db.flush()
+        self.db.refresh(document)
+        return document
