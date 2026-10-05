@@ -3,7 +3,7 @@ import shutil
 import tempfile
 import pytest
 import pymupdf
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
@@ -25,6 +25,9 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 def setup_test_database():
     """Create all tables in the test database before tests run."""
     # Note: The test database `research_platform_test` must already exist.
+    with test_engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        conn.commit()
     Base.metadata.drop_all(bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
     yield
