@@ -13,13 +13,12 @@ router = APIRouter(prefix="/projects", tags=["Search"])
 @router.get(
     "/{project_id}/search",
     response_model=SearchResponse,
-    summary="Keyword search over document chunks",
+    summary="Keyword or Semantic search over document chunks",
     description=(
         "Search all processed document chunks within a project using "
-        "PostgreSQL full-text search. Supports Google-like query syntax: "
-        'quoted phrases ("attention mechanism"), OR, and exclusion with -. '
-        "Results are ranked by cover-density relevance (ts_rank_cd) and "
-        "include highlighted snippets with matching terms wrapped in <mark> tags."
+        "PostgreSQL full-text search (keyword) or vector similarity (semantic). "
+        "Keyword mode supports Google-like query syntax (quoted phrases, OR, -). "
+        "Semantic mode uses cosine similarity on sentence-transformer embeddings."
     ),
 )
 def search_chunks(
@@ -28,10 +27,12 @@ def search_chunks(
         ...,
         min_length=1,
         max_length=500,
-        description=(
-            "Search query. Supports: plain terms (AND implicit), "
-            '"quoted phrases", OR, and -exclusion.'
-        ),
+        description="Search query.",
+    ),
+    mode: str = Query(
+        "keyword",
+        pattern="^(keyword|semantic)$",
+        description="Search mode: 'keyword' (FTS) or 'semantic' (vector similarity).",
     ),
     document_id: Optional[int] = Query(
         None,
@@ -50,19 +51,21 @@ def search_chunks(
     ),
     db: Session = Depends(get_db),
 ) -> SearchResponse:
-    """Full-text keyword search over document chunks in a project.
+    """Keyword or Semantic search over document chunks in a project.
 
     Scoped to a single project. Optionally filtered to a specific document.
 
     Raises:
         400 Bad Request: If the query is empty or too long.
         404 Not Found: If the project or specified document does not exist.
+        422 Unprocessable Entity: If mode is not keyword/semantic.
     """
     service = SearchService(db)
     try:
         return service.search(
             project_id=project_id,
             query=q,
+            mode=mode,
             document_id=document_id,
             limit=limit,
             offset=offset,
