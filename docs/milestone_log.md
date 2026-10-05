@@ -90,4 +90,14 @@
 
 ---
 
+### Milestone 5 — Semantic Retrieval
+**Version**: `v0.5` | **Migration**: `65b2e998f04a`
+**Full Chronicle**: [m05_semantic_retrieval.md](milestones/m05_semantic_retrieval.md)
+
+**What was built**: Introduced dense vector embeddings and semantic search. Added `pgvector` to PostgreSQL and an `embedding vector(384)` column to the `chunks` table. Decoupled embedding generation into a dedicated `POST /api/projects/{project_id}/documents/{document_id}/embed` endpoint that batches texts and generates vectors locally using `sentence-transformers/all-MiniLM-L6-v2`. Created a `VectorSearchRepository` for computing cosine distance. The existing `GET /api/projects/{project_id}/search` endpoint was updated to accept a `mode` parameter (`keyword` or `semantic`), delegating semantic queries to `VectorSearchRepository`. 5 new integration tests, 65 total passing, 0 regressions.
+
+**Key Architectural Decision**: **`pgvector` vs Dedicated Vector DB** — Keeps architecture strictly relational; vector data lives alongside metadata for precise, fast filtering without synchronization overhead. **Local sentence-transformers vs OpenAI** — Provides a cost-free, private, offline-capable baseline. **Dedicated `/embed` API vs Auto-embed** — Embedding is heavily compute-bound; decoupling it ensures fast document ingestion and paves the way for background task processing in production.
+
+---
+
 *(Add each new milestone summary here after its deep-dive file is written.)*
