@@ -18,8 +18,8 @@
 | 1 | Research Project Management | ✅ Completed | [m01_project_management.md](milestones/m01_project_management.md) |
 | 2 | Document Upload & Management | ✅ Completed | [m02_document_management.md](milestones/m02_document_management.md) |
 | 3 | PDF Processing & Chunking | ✅ Completed | [m03_pdf_processing.md](milestones/m03_pdf_processing.md) |
-| 4 | Baseline Keyword Search | 🔄 In Progress | *(coming soon)* |
-| 5 | Semantic Retrieval | ⏳ Upcoming | — |
+| 4 | Baseline Keyword Search | ✅ Completed | [m04_baseline_search.md](milestones/m04_baseline_search.md) |
+| 5 | Semantic Retrieval | 🔄 In Progress | (coming soon) |
 | 6 | Hybrid Retrieval | ⏳ Upcoming | — |
 | 7 | Reranking | ⏳ Upcoming | — |
 | 8 | RAG & Evidence-Grounded Answers | ⏳ Upcoming | — |
@@ -77,6 +77,16 @@
 **What was built**: Implemented the PDF-to-chunk ingestion pipeline. A new `POST .../process` endpoint triggers `ProcessingService`, which orchestrates: document status validation → `uploaded → processing` transition → PyMuPDF page-by-page text extraction → text cleaning (hyphenation rejoining, whitespace normalization) → fixed-size chunking (1000 chars, 200-char overlap) → bulk chunk insert → atomic commit with final `processing → processed` status transition (or `→ failed` on error). Three API endpoints: process, list chunks, get chunk. Chunk provenance preserved: `page_start`, `page_end`, `char_offset_start`, `char_offset_end`, `chunk_index`. 14 new integration tests, 40 total passing, 0 regressions.
 
 **Key Architectural Decision**: **Fixed-size chunking with overlap** (1000 chars / 200-char overlap) chosen as the baseline — the simplest, most predictable strategy that establishes a measurable retrieval baseline before introducing section-aware or semantic chunking. **`flush()` over `commit()`** in repositories allows `ProcessingService` to own the transaction boundary, committing chunks and status atomically in a single transaction. **Separate `POST .../process` endpoint** (not auto-process on upload) keeps upload fast and debuggable, and cleanly maps to background job processing in a future milestone.
+
+---
+
+### Milestone 4 — Baseline Keyword Search
+**Version**: `v0.4` | **Migration**: `8991abfba909`
+**Full Chronicle**: [m04_baseline_search.md](milestones/m04_baseline_search.md)
+
+**What was built**: Implemented deterministic full-text keyword search over document chunks using PostgreSQL's native FTS engine. A `search_vector tsvector` column — declared `GENERATED ALWAYS AS (to_tsvector('english', content)) STORED` — was added to the `chunks` table and indexed with a GIN index. A new `SearchRepository` encapsulates all FTS query logic: `websearch_to_tsquery` for Google-like query parsing, `ts_rank_cd` for cover-density relevance ranking (normalized to `(0,1)`), and `ts_headline` for highlighted `<mark>`-tagged result snippets. A `SearchService` orchestrates validation, project/document scoping, and query timing. A single `GET /api/projects/{project_id}/search` endpoint exposes search with pagination and optional document filtering. The `SearchResponse` includes `query_time_ms` to establish the retrieval latency baseline for future milestones. 20 new integration tests, 60 total passing, 0 regressions.
+
+**Key Architectural Decision**: **PostgreSQL FTS over in-memory BM25 or Elasticsearch** — zero additional infrastructure, transactionally consistent (chunks are searchable the instant they are committed), and the lexical arm plugs directly into Milestone 6's hybrid retrieval architecture where both FTS and pgvector queries run in the same database. The **`GENERATED ALWAYS AS STORED`** generated column is the critical design choice: the `tsvector` is pre-computed at write time (chunks are written once, searched many times), eliminating per-query recomputation. The **`SearchRepository` / `SearchService` separation** mirrors the established pattern and ensures that adding a `VectorSearchRepository` in Milestone 5 requires zero changes to the FTS code.
 
 ---
 
