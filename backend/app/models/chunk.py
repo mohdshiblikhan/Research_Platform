@@ -1,4 +1,7 @@
-from sqlalchemy import ForeignKey, Text
+from typing import Any
+
+from sqlalchemy import Computed, ForeignKey, Text
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base_class import Base
@@ -42,3 +45,15 @@ class Chunk(Base):
 
     chunk_size: Mapped[int] = mapped_column(nullable=False)
     """Length of the content field in characters."""
+
+    search_vector: Mapped[Any] = mapped_column(
+        TSVECTOR,
+        Computed("to_tsvector('english', content)", persisted=True),
+        nullable=True,
+    )
+    """PostgreSQL tsvector for full-text search (auto-maintained generated column).
+
+    GENERATED ALWAYS AS (to_tsvector('english', content)) STORED.
+    PostgreSQL updates this automatically on every INSERT or UPDATE to `content`.
+    Never set or updated by application code.
+    """
