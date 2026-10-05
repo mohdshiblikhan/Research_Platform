@@ -1,0 +1,60 @@
+from pydantic import BaseModel
+
+
+class SearchResultItem(BaseModel):
+    """A single search result: a matched chunk with relevance metadata.
+
+    Attributes:
+        chunk_id: Primary key of the matching chunk.
+        document_id: Primary key of the document containing this chunk.
+        document_filename: Filename of the source document (denormalized from
+            the JOIN — avoids N+1 lookups when rendering a results list).
+        chunk_index: Position of this chunk in the document (0-based).
+        content: Full text content of the chunk.
+        headline: PostgreSQL ts_headline snippet with <mark>...</mark> tags
+            wrapping matching query terms. Used for search result previews.
+        page_start: First page this chunk overlaps (1-based).
+        page_end: Last page this chunk overlaps (1-based).
+        char_offset_start: Start character offset in the full document text.
+        char_offset_end: End character offset in the full document text.
+        rank: ts_rank_cd relevance score, normalized to (0, 1). Higher is
+            more relevant. Scores are relative within a single query result
+            set and are NOT comparable across different queries.
+    """
+
+    chunk_id: int
+    document_id: int
+    document_filename: str
+    chunk_index: int
+    content: str
+    headline: str
+    page_start: int
+    page_end: int
+    char_offset_start: int
+    char_offset_end: int
+    rank: float
+
+
+class SearchResponse(BaseModel):
+    """Top-level response for a keyword search query.
+
+    Attributes:
+        query: The original search query string (echoed back).
+        project_id: The project that was searched.
+        total_results: Total number of matching chunks (ignores limit/offset).
+            Used by clients to build pagination UI.
+        limit: The page size used for this response.
+        offset: The pagination offset used for this response.
+        query_time_ms: Server-side search execution time in milliseconds.
+            Logged and returned to establish the baseline retrieval latency
+            for comparison against future semantic and hybrid retrieval.
+        results: The ranked search result items for this page.
+    """
+
+    query: str
+    project_id: int
+    total_results: int
+    limit: int
+    offset: int
+    query_time_ms: float
+    results: list[SearchResultItem]
