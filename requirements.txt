@@ -8,3 +8,5 @@ pydantic-settings
 python-multipart
 pymupdf
 pytesthttpx
+sentence-transformers
+pgvector

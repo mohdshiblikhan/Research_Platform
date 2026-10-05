@@ -51,3 +51,24 @@ class ChunkRepository:
             .filter(Chunk.document_id == document_id)
             .count()
         )
+
+    def update_embeddings(
+        self, chunk_ids: list[int], embeddings: list[list[float]]
+    ) -> int:
+        """Bulk-update embedding vectors for the given chunks.
+
+        Returns the number of rows updated.
+        """
+        if len(chunk_ids) != len(embeddings):
+            raise ValueError("Number of chunks and embeddings must match.")
+
+        if not chunk_ids:
+            return 0
+
+        # Create mapping of id -> embedding
+        updates = [{"id": cid, "embedding": emb} for cid, emb in zip(chunk_ids, embeddings)]
+        
+        # Use bulk_update_mappings for fast bulk updates
+        self.db.bulk_update_mappings(Chunk, updates)
+        self.db.flush()
+        return len(chunk_ids)
