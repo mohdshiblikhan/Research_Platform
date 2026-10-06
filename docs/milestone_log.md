@@ -19,9 +19,9 @@
 | 2 | Document Upload & Management | ✅ Completed | [m02_document_management.md](milestones/m02_document_management.md) |
 | 3 | PDF Processing & Chunking | ✅ Completed | [m03_pdf_processing.md](milestones/m03_pdf_processing.md) |
 | 4 | Baseline Keyword Search | ✅ Completed | [m04_baseline_search.md](milestones/m04_baseline_search.md) |
-| 5 | Semantic Retrieval | 🔄 In Progress | (coming soon) |
-| 6 | Hybrid Retrieval | ⏳ Upcoming | — |
-| 7 | Reranking | ⏳ Upcoming | — |
+| 5 | Semantic Retrieval | ✅ Completed | [m05_semantic_retrieval.md](milestones/m05_semantic_retrieval.md) |
+| 6 | Hybrid Retrieval | ✅ Completed | [m06_hybrid_retrieval.md](milestones/m06_hybrid_retrieval.md) |
+| 7 | Reranking | 🔄 In Progress | (coming soon) |
 | 8 | RAG & Evidence-Grounded Answers | ⏳ Upcoming | — |
 | 9 | Structured Research Extraction | ⏳ Upcoming | — |
 | 10 | Literature Comparison | ⏳ Upcoming | — |
@@ -97,6 +97,16 @@
 **What was built**: Introduced dense vector embeddings and semantic search. Added `pgvector` to PostgreSQL and an `embedding vector(384)` column to the `chunks` table. Decoupled embedding generation into a dedicated `POST /api/projects/{project_id}/documents/{document_id}/embed` endpoint that batches texts and generates vectors locally using `sentence-transformers/all-MiniLM-L6-v2`. Created a `VectorSearchRepository` for computing cosine distance. The existing `GET /api/projects/{project_id}/search` endpoint was updated to accept a `mode` parameter (`keyword` or `semantic`), delegating semantic queries to `VectorSearchRepository`. 5 new integration tests, 65 total passing, 0 regressions.
 
 **Key Architectural Decision**: **`pgvector` vs Dedicated Vector DB** — Keeps architecture strictly relational; vector data lives alongside metadata for precise, fast filtering without synchronization overhead. **Local sentence-transformers vs OpenAI** — Provides a cost-free, private, offline-capable baseline. **Dedicated `/embed` API vs Auto-embed** — Embedding is heavily compute-bound; decoupling it ensures fast document ingestion and paves the way for background task processing in production.
+
+---
+
+### Milestone 6 — Hybrid Retrieval
+**Version**: `v0.6` | **Migration**: None (App level changes only)
+**Full Chronicle**: [m06_hybrid_retrieval.md](milestones/m06_hybrid_retrieval.md)
+
+**What was built**: Implemented a Hybrid Retrieval engine combining the exact-match precision of keyword search with the conceptual matching of semantic search. Added a new `mode="hybrid"` to the search endpoint. The system independently queries both the `SearchRepository` and `VectorSearchRepository` (fetching up to 60 chunks from each), and dynamically computes a Reciprocal Rank Fusion (RRF) score in memory to return a single paginated list of unified results. 2 new integration tests, 68 total tests passing, 0 regressions.
+
+**Key Architectural Decision**: **Rank-based fusion (RRF) in the Application Layer** — RRF avoids the fragility of normalizing fundamentally different score scales (unbounded `ts_rank` vs bounded vector distance). Pushing the fusion logic to the Python application layer rather than a complex SQL CTE keeps the repositories purely focused on single-mode retrieval and makes the fusion orchestrator fully isolated and easily testable.
 
 ---
 
