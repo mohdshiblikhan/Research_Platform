@@ -9,6 +9,7 @@ from app.repositories.document_repository import DocumentRepository
 from app.repositories.search_repository import SearchRepository
 from app.repositories.vector_search_repository import VectorSearchRepository
 from app.services.embedding_service_factory import get_embedding_service
+from app.services.reranking_service import get_reranking_service
 from app.schemas.search import SearchResponse, SearchResultItem
 
 logger = logging.getLogger(__name__)
@@ -36,12 +37,14 @@ class SearchService:
         self.search_repo = SearchRepository(db)
         self.vector_search_repo = VectorSearchRepository(db)
         self.embedding_service = get_embedding_service()
+        self.reranking_service = get_reranking_service()
 
     def search(
         self,
         project_id: int,
         query: str,
         mode: Literal["keyword", "semantic", "hybrid"] = "keyword",
+        rerank: bool = False,
         document_id: Optional[int] = None,
         limit: int = 20,
         offset: int = 0,
@@ -51,7 +54,8 @@ class SearchService:
         Args:
             project_id: The project to search within.
             query: Raw user search string. Parsed by websearch_to_tsquery.
-            mode: Search mode ('keyword' or 'semantic').
+            mode: Search mode ('keyword', 'semantic', or 'hybrid').
+            rerank: Whether to apply cross-encoder reranking to the top results.
             document_id: Optional document filter. If given, only chunks
                 from that document are returned.
             limit: Max results per page (1-100).
@@ -94,13 +98,18 @@ class SearchService:
         # --- Execute search and measure latency -------------------------------
         start = time.perf_counter()
         
+        
+        # If reranking, we fetch a larger candidate pool first
+        fetch_limit = 60 if rerank else limit
+        fetch_offset = 0 if rerank else offset
+        
         if mode == "keyword":
             results, total_count = self.search_repo.search(
                 project_id=project_id,
                 query=query,
                 document_id=document_id,
-                limit=limit,
-                offset=offset,
+                limit=fetch_limit,
+                offset=fetch_offset,
             )
         elif mode == "semantic":
             query_embedding = self.embedding_service.embed_query(query)
@@ -108,18 +117,25 @@ class SearchService:
                 project_id=project_id,
                 query_embedding=query_embedding,
                 document_id=document_id,
-                limit=limit,
-                offset=offset,
+                limit=fetch_limit,
+                offset=fetch_offset,
             )
         else:
             # Hybrid mode
+            # We don't pass offset directly to hybrid because it fetches 60 and applies it later.
+            # But if we're reranking, we need to pass a larger limit and not apply the offset yet.
             results, total_count = self._perform_hybrid_search(
                 project_id=project_id,
                 query=query,
                 document_id=document_id,
-                limit=limit,
-                offset=offset,
+                limit=fetch_limit,
+                offset=fetch_offset,
             )
+            
+        if rerank and results:
+            results = self.reranking_service.rerank(query, results)
+            # Apply limit and offset after reranking
+            results = results[offset : offset + limit]
             
         query_time_ms = round((time.perf_counter() - start) * 1000, 2)
 
@@ -129,6 +145,7 @@ class SearchService:
                 "project_id": project_id,
                 "query": query,
                 "mode": mode,
+                "rerank": rerank,
                 "document_id": document_id,
                 "total_results": total_count,
                 "returned": len(results),

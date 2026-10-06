@@ -39,6 +39,10 @@ def search_chunks(
         None,
         description="Restrict search to a specific document within the project.",
     ),
+    rerank: bool = Query(
+        False,
+        description="Whether to apply cross-encoder reranking to the top results.",
+    ),
     limit: int = Query(
         20,
         ge=1,
@@ -67,6 +71,7 @@ def search_chunks(
             project_id=project_id,
             query=q,
             mode=mode,
+            rerank=rerank,
             document_id=document_id,
             limit=limit,
             offset=offset,
