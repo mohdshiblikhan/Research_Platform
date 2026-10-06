@@ -21,8 +21,8 @@
 | 4 | Baseline Keyword Search | ✅ Completed | [m04_baseline_search.md](milestones/m04_baseline_search.md) |
 | 5 | Semantic Retrieval | ✅ Completed | [m05_semantic_retrieval.md](milestones/m05_semantic_retrieval.md) |
 | 6 | Hybrid Retrieval | ✅ Completed | [m06_hybrid_retrieval.md](milestones/m06_hybrid_retrieval.md) |
-| 7 | Reranking | 🔄 In Progress | (coming soon) |
-| 8 | RAG & Evidence-Grounded Answers | ⏳ Upcoming | — |
+| 7 | Reranking | ✅ Completed | [m07_reranking.md](milestones/m07_reranking.md) |
+| 8 | RAG & Evidence-Grounded Answers | 🔄 In Progress | (coming soon) |
 | 9 | Structured Research Extraction | ⏳ Upcoming | — |
 | 10 | Literature Comparison | ⏳ Upcoming | — |
 | 11 | Research Planning | ⏳ Upcoming | — |
@@ -107,6 +107,16 @@
 **What was built**: Implemented a Hybrid Retrieval engine combining the exact-match precision of keyword search with the conceptual matching of semantic search. Added a new `mode="hybrid"` to the search endpoint. The system independently queries both the `SearchRepository` and `VectorSearchRepository` (fetching up to 60 chunks from each), and dynamically computes a Reciprocal Rank Fusion (RRF) score in memory to return a single paginated list of unified results. 2 new integration tests, 68 total tests passing, 0 regressions.
 
 **Key Architectural Decision**: **Rank-based fusion (RRF) in the Application Layer** — RRF avoids the fragility of normalizing fundamentally different score scales (unbounded `ts_rank` vs bounded vector distance). Pushing the fusion logic to the Python application layer rather than a complex SQL CTE keeps the repositories purely focused on single-mode retrieval and makes the fusion orchestrator fully isolated and easily testable.
+
+---
+
+### Milestone 7 — Reranking
+**Version**: `v0.7` | **Migration**: None (App level changes only)  
+**Full Chronicle**: [m07_reranking.md](milestones/m07_reranking.md)
+
+**What was built**: Introduced a two-stage retrieval architecture by integrating a Cross-Encoder reranker (`cross-encoder/ms-marco-MiniLM-L-6-v2`) via `RerankingService`. Added an orthogonal `rerank: bool` flag to `GET /api/projects/{project_id}/search` and extended `SearchResultItem` with `rerank_score`. When enabled, `SearchService` retrieves an internal candidate pool of 60 items from the first-stage retriever (keyword, semantic, or hybrid), computes full cross-attention relevance scores, sorts candidates descending by `rerank_score`, and slices the pagination window (`offset` and `limit`) post-rerank. 9 new unit and integration tests, 77 total tests passing, 0 regressions.
+
+**Key Architectural Decision**: **Orthogonal boolean flag over dedicated mode & Post-rerank pagination** — Reranking was exposed as a `rerank: bool` parameter rather than a `mode="rerank"` or `mode="hybrid_rerank"` to allow layering over any first-stage retriever (keyword, semantic, or hybrid) without combinatorial explosion of search modes. For pagination, `SearchService` deliberately fetches a fixed pool of 60 candidates before reranking and applies the caller's pagination slice *after* scoring and sorting, ensuring the reranker always evaluates a healthy candidate pool regardless of requested page depth. Unit and API tests mock the CrossEncoder for deterministic, sub-second CI validation, separating structural correctness testing from model quality evaluation.
 
 ---
 
