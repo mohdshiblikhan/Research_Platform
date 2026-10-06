@@ -16,7 +16,8 @@ router = APIRouter(prefix="/projects", tags=["Search"])
     summary="Keyword or Semantic search over document chunks",
     description=(
         "Search all processed document chunks within a project using "
-        "PostgreSQL full-text search (keyword) or vector similarity (semantic). "
+        "PostgreSQL full-text search (keyword), vector similarity (semantic), "
+        "or a hybrid of both using Reciprocal Rank Fusion (hybrid). "
         "Keyword mode supports Google-like query syntax (quoted phrases, OR, -). "
         "Semantic mode uses cosine similarity on sentence-transformer embeddings."
     ),
@@ -31,8 +32,8 @@ def search_chunks(
     ),
     mode: str = Query(
         "keyword",
-        pattern="^(keyword|semantic)$",
-        description="Search mode: 'keyword' (FTS) or 'semantic' (vector similarity).",
+        pattern="^(keyword|semantic|hybrid)$",
+        description="Search mode: 'keyword' (FTS), 'semantic' (vector similarity), or 'hybrid'.",
     ),
     document_id: Optional[int] = Query(
         None,
@@ -51,14 +52,14 @@ def search_chunks(
     ),
     db: Session = Depends(get_db),
 ) -> SearchResponse:
-    """Keyword or Semantic search over document chunks in a project.
+    """Keyword, Semantic, or Hybrid search over document chunks in a project.
 
     Scoped to a single project. Optionally filtered to a specific document.
 
     Raises:
         400 Bad Request: If the query is empty or too long.
         404 Not Found: If the project or specified document does not exist.
-        422 Unprocessable Entity: If mode is not keyword/semantic.
+        422 Unprocessable Entity: If mode is not keyword/semantic/hybrid.
     """
     service = SearchService(db)
     try:
