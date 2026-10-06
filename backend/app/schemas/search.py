@@ -21,6 +21,7 @@ class SearchResultItem(BaseModel):
         char_offset_end: End character offset in the full document text.
         rank: ts_rank_cd relevance score, normalized to (0, 1). None for semantic.
         similarity_score: 1.0 - cosine_distance. None for FTS keyword search.
+        rrf_score: Reciprocal Rank Fusion score. None for keyword and semantic.
     """
 
     chunk_id: int
@@ -35,6 +36,7 @@ class SearchResultItem(BaseModel):
     char_offset_end: int
     rank: Optional[float] = None
     similarity_score: Optional[float] = None
+    rrf_score: Optional[float] = None
 
 
 class SearchResponse(BaseModel):
@@ -43,7 +45,7 @@ class SearchResponse(BaseModel):
     Attributes:
         query: The original search query string (echoed back).
         project_id: The project that was searched.
-        search_mode: 'keyword' or 'semantic'
+        search_mode: 'keyword', 'semantic', or 'hybrid'
         total_results: Total number of matching chunks (ignores limit/offset).
             Used by clients to build pagination UI.
         limit: The page size used for this response.
@@ -57,7 +59,7 @@ class SearchResponse(BaseModel):
 
     query: str
     project_id: int
-    search_mode: Literal["keyword", "semantic"]
+    search_mode: Literal["keyword", "semantic", "hybrid"]
     total_results: int
     limit: int
     offset: int

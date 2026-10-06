@@ -9,7 +9,7 @@ from app.repositories.document_repository import DocumentRepository
 from app.repositories.search_repository import SearchRepository
 from app.repositories.vector_search_repository import VectorSearchRepository
 from app.services.embedding_service_factory import get_embedding_service
-from app.schemas.search import SearchResponse
+from app.schemas.search import SearchResponse, SearchResultItem
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class SearchService:
         self,
         project_id: int,
         query: str,
-        mode: Literal["keyword", "semantic"] = "keyword",
+        mode: Literal["keyword", "semantic", "hybrid"] = "keyword",
         document_id: Optional[int] = None,
         limit: int = 20,
         offset: int = 0,
@@ -75,7 +75,7 @@ class SearchService:
                 f"Search query must be {self.MAX_QUERY_LENGTH} characters or fewer"
             )
             
-        if mode not in ["keyword", "semantic"]:
+        if mode not in ["keyword", "semantic", "hybrid"]:
             raise ValueError(f"Unknown search mode: {mode}")
 
         # --- Project validation -----------------------------------------------
@@ -102,12 +102,20 @@ class SearchService:
                 limit=limit,
                 offset=offset,
             )
-        else:
-            # Semantic mode
+        elif mode == "semantic":
             query_embedding = self.embedding_service.embed_query(query)
             results, total_count = self.vector_search_repo.search(
                 project_id=project_id,
                 query_embedding=query_embedding,
+                document_id=document_id,
+                limit=limit,
+                offset=offset,
+            )
+        else:
+            # Hybrid mode
+            results, total_count = self._perform_hybrid_search(
+                project_id=project_id,
+                query=query,
                 document_id=document_id,
                 limit=limit,
                 offset=offset,
@@ -141,3 +149,71 @@ class SearchService:
             document_id=document_id,
             results=results,
         )
+
+    def _perform_hybrid_search(
+        self,
+        project_id: int,
+        query: str,
+        document_id: Optional[int],
+        limit: int,
+        offset: int,
+    ) -> tuple[list[SearchResultItem], int]:
+        """Perform Reciprocal Rank Fusion (RRF) on keyword and semantic results."""
+        fusion_k = 60
+        fetch_limit = 60
+
+        # Fetch from Keyword Search
+        keyword_results, keyword_count = self.search_repo.search(
+            project_id=project_id,
+            query=query,
+            document_id=document_id,
+            limit=fetch_limit,
+            offset=0,
+        )
+
+        # Fetch from Vector Search
+        query_embedding = self.embedding_service.embed_query(query)
+        vector_results, vector_count = self.vector_search_repo.search(
+            project_id=project_id,
+            query_embedding=query_embedding,
+            document_id=document_id,
+            limit=fetch_limit,
+            offset=0,
+        )
+
+        # RRF Fusion
+        scores: dict[int, float] = {}
+        items: dict[int, SearchResultItem] = {}
+
+        for rank, item in enumerate(keyword_results, start=1):
+            if item.chunk_id not in scores:
+                scores[item.chunk_id] = 0.0
+                items[item.chunk_id] = item
+            scores[item.chunk_id] += 1.0 / (fusion_k + rank)
+
+        for rank, item in enumerate(vector_results, start=1):
+            if item.chunk_id not in scores:
+                scores[item.chunk_id] = 0.0
+                items[item.chunk_id] = item
+            else:
+                # Merge semantic data into existing item
+                items[item.chunk_id].similarity_score = item.similarity_score
+                # Vector search doesn't return headline, so keep the keyword one
+                
+            scores[item.chunk_id] += 1.0 / (fusion_k + rank)
+
+        # Sort by RRF score descending
+        fused_items = []
+        for chunk_id, rrf_score in sorted(scores.items(), key=lambda x: x[1], reverse=True):
+            item = items[chunk_id]
+            item.rrf_score = round(rrf_score, 4)
+            fused_items.append(item)
+
+        # Apply limit and offset
+        paginated_results = fused_items[offset : offset + limit]
+        
+        # Approximate total count
+        total_count = max(keyword_count, vector_count)
+        
+        return paginated_results, total_count
+
