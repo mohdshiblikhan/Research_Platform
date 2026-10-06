@@ -22,6 +22,7 @@ class SearchResultItem(BaseModel):
         rank: ts_rank_cd relevance score, normalized to (0, 1). None for semantic.
         similarity_score: 1.0 - cosine_distance. None for FTS keyword search.
         rrf_score: Reciprocal Rank Fusion score. None for keyword and semantic.
+        rerank_score: Cross-encoder reranking score. None if reranking is disabled.
     """
 
     chunk_id: int
@@ -37,6 +38,7 @@ class SearchResultItem(BaseModel):
     rank: Optional[float] = None
     similarity_score: Optional[float] = None
     rrf_score: Optional[float] = None
+    rerank_score: Optional[float] = None
 
 
 class SearchResponse(BaseModel):
