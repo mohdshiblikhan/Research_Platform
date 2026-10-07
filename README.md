@@ -5,34 +5,25 @@
 ---
 
 > 🚧 **Status: Under Active Development**
----
 
 ## 📌 Overview
 
 Most AI research tools act as simple conversational chatbots or naive RAG wrappers that lack traceability, structured understanding, and empirical rigor. 
 
-This platform is engineered as an **evidence-driven research system** where LLMs and search pipelines are components inside a robust, observable backend. The goal is to support the full scientific inquiry cycle:
+This platform is engineered as an **evidence-driven research system** where LLMs and search pipelines are components inside a robust, observable backend. The long-term goal is to build a genuine AI/ML research system where every major architectural decision is evaluated against empirical baselines.
 
+The system supports the full scientific inquiry cycle:
 $$\text{Research Question} \to \text{Literature Ingestion} \to \text{Multi-Stage Retrieval} \to \text{Evidence Grounding} \to \text{Structured Analysis} \to \text{Experimentation} \to \text{Evaluation}$$
 
 ---
 
-## 🎯 Key Capabilities
+## 🏗️ Architecture
 
-- **Project-Centric Organization**: Manage research questions, papers, and notes within isolated research projects.
-- **Strict Provenance & Citations**: Ingest research PDFs and preserve exact document provenance (page numbers, chunk indices, and source context) to eliminate hallucinated references.
-- **Progressive Retrieval Pipeline**: Establish deterministic keyword baselines first, then systematically layer semantic (vector) search, hybrid fusion, and cross-encoder reranking.
-- **Evidence-Grounded RAG**: Generate synthesized answers with direct lineage tracing back to source passages.
-- **Structured Knowledge Extraction**: Extract structured methodologies, datasets, baselines, and findings from papers to facilitate cross-paper comparisons.
-- **Experiment Tracking & Evaluation**: Track retrieval metrics (Recall@K, MRR, nDCG) and generation quality (faithfulness, citation accuracy) with empirical benchmarks.
+The platform starts as a **modular monolith** backend designed for maintainability, testability, and clear separation of concerns. It deliberately avoids microservices or unnecessary abstractions until empirical data justifies them.
 
----
+### High-Level System Flow
 
-## 🏗️ Architecture & How It Works
-
-The platform starts as a **clean, modular monolith** backend designed for maintainability, testability, and clear separation of concerns:
-
-```
+```text
 [ Research User / Client ]
             │
             ▼
@@ -48,47 +39,81 @@ The platform starts as a **clean, modular monolith** backend designed for mainta
 [ File Storage / PDFs ]      [ PostgreSQL (SQLAlchemy + Alembic) ]
 ```
 
-### Ingestion & Evidence Flow
+### Ingestion & Evidence Pipeline
 1. **Upload**: Research papers (PDFs) are uploaded and linked to specific projects.
-2. **Extraction & Chunking**: PDFs are parsed while preserving page boundaries and chunk ordering.
-3. **Indexing**: Chunks are indexed for full-text search and embedded for semantic retrieval.
-4. **Retrieval & Reranking**: Queries pass through hybrid retrieval (keyword + dense embeddings) and reranking.
-5. **Synthesis & Grounding**: LLMs generate responses strictly grounded in retrieved evidence with exact page citations.
+2. **Extraction & Chunking**: PDFs are parsed using `PyMuPDF`, preserving exact page boundaries and chunk ordering.
+3. **Indexing**: Chunks are stored in PostgreSQL, indexed for full-text keyword search, and embedded via local sentence-transformers for semantic retrieval (using `pgvector`).
+4. **Hybrid Retrieval & Reranking**: Queries pass through Reciprocal Rank Fusion (RRF) combining keyword and dense embeddings, followed by a cross-encoder reranking stage.
+5. **Synthesis & Grounding**: Local LLMs (Ollama) generate responses strictly grounded in retrieved evidence with exact page-level citations.
 
 ---
 
-## 🛠️ Tech Stack
+## 📂 Project Structure
 
-- **Backend Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11+)
-- **Validation & Settings**: [Pydantic v2](https://docs.pydantic.dev/) & Pydantic Settings
-- **Database & ORM**: [PostgreSQL](https://www.postgresql.org/) with [SQLAlchemy 2.0](https://www.sqlalchemy.org/)
+```text
+research-platform/
+├── backend/                  # FastAPI Application
+│   ├── alembic/              # Database Migrations
+│   ├── app/                  # Main Application Logic
+│   │   ├── api/              # REST API Routers and Endpoints
+│   │   ├── core/             # Pydantic Settings & App Configuration
+│   │   ├── db/               # SQLAlchemy Session Setup & Base Class
+│   │   ├── models/           # SQLAlchemy ORM Models (Project, Document, Chunk)
+│   │   ├── prompts/          # LLM Prompt Templates (e.g., RAG)
+│   │   ├── repositories/     # Data Access Layer (CRUD, Vector Search, FTS)
+│   │   ├── schemas/          # Pydantic Validation & Response Models
+│   │   └── services/         # Business Logic (Ingestion, Hybrid Search, LLMs)
+│   └── tests/                # Pytest Suite (Transactional DB Rollbacks)
+├── docs/                     # Architectural Decisions & Milestone Chronicles
+│   ├── milestone_log.md      # Master index and executive summary hub for each milestone
+│   └── milestones/           # Detailed write-ups for each completed phase
+└── README.md                 # This file
+```
+
+---
+
+## 🎯 Core Features (Implemented)
+
+- **Project-Centric Organization**: Manage research questions, papers, and notes within isolated research projects.
+- **Strict Provenance & Citations**: Exact document provenance (page numbers, chunk indices) is preserved to eliminate hallucinated references.
+- **Multi-Stage Retrieval**: Deterministic keyword search (FTS), semantic search (Embeddings), Hybrid Retrieval (RRF), and Cross-Encoder Reranking.
+- **Evidence-Grounded Answers (RAG)**: Single-Call Chain-of-Thought prompting that enforces index-based citation verification against real chunks.
+
+---
+
+## 🛠️ Technology Stack
+
+- **Backend**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11+)
+- **Validation**: [Pydantic v2](https://docs.pydantic.dev/)
+- **Database & ORM**: [PostgreSQL](https://www.postgresql.org/) & [SQLAlchemy 2.0](https://www.sqlalchemy.org/)
 - **Database Migrations**: [Alembic](https://alembic.sqlalchemy.org/)
-- **Database Driver**: `psycopg` (v3)
 - **Document Processing**: [PyMuPDF](https://pymupdf.readthedocs.io/) (`fitz`)
-- **Testing**: [pytest](https://docs.pytest.org/) & [HTTPX](https://www.python-httpx.org/) (Async TestClient)
-- **Retrieval & AI (Progressive Roadmap)**:
-  - Lexical Search (PostgreSQL Full-Text / BM25)
-  - Vector Embeddings & Similarity Search
-  - Reciprocal Rank Fusion (Hybrid Retrieval)
-  - Cross-Encoder Reranking
-  - Structured LLM Orchestration & Evaluation
+- **AI / ML Ecosystem**:
+  - Embeddings: `sentence-transformers` (`all-MiniLM-L6-v2`) & `pgvector`
+  - Reranking: `cross-encoder/ms-marco-MiniLM-L-6-v2`
+  - Generation: Local LLMs via `Ollama`
+- **Testing**: [pytest](https://docs.pytest.org/) (with Async TestClient & Transactional DB Isolation)
 
 ---
 
 ## 🗺️ Progressive Roadmap
 
-Development follows a strict milestone discipline where every AI addition is evaluated against empirical baselines:
+Development follows a strict milestone discipline where every AI addition is evaluated against empirical baselines. The project is currently at **Milestone 9** (Structured Research Extraction).
 
-- [x] **Phase 0: Foundation** — Project scaffolding, database configuration, testing setup, Alembic migrations.
-- [x] **Phase 1: Project Management** — Full CRUD APIs and schemas for research projects.
-- [ ] **Phase 2: Document Management & Ingestion** — PDF upload, file storage, and metadata management *(In Progress)*.
-- [ ] **Phase 3: Text Extraction & Chunking** — Page preservation, text cleaning, chunking with strict provenance.
-- [ ] **Phase 4: Baseline Retrieval** — Deterministic keyword search baseline.
-- [ ] **Phase 5: Semantic Retrieval** — Embeddings and vector similarity search.
-- [ ] **Phase 6: Hybrid Retrieval & Reranking** — Dense + sparse fusion with cross-encoder rerankers.
-- [ ] **Phase 7: Evidence-Grounded RAG** — LLM response synthesis with verified citations.
-- [ ] **Phase 8: Structured Research Extraction** — Methods, datasets, and claims extraction.
-- [ ] **Phase 9: Experiment Tracking & Evaluation** — Quantitative retrieval & generation evaluation framework.
+- [x] **Milestone 0: Foundation** — Project scaffolding, database configuration, testing setup, Alembic migrations.
+- [x] **Milestone 1: Project Management** — Full CRUD APIs and schemas for research projects.
+- [x] **Milestone 2: Document Management & Ingestion** — PDF upload, file storage, and metadata management.
+- [x] **Milestone 3: PDF Processing & Chunking** — Page preservation, text cleaning, chunking with strict provenance.
+- [x] **Milestone 4: Baseline Keyword Search** — Deterministic FTS keyword search baseline.
+- [x] **Milestone 5: Semantic Retrieval** — Embeddings and vector similarity search (`pgvector`).
+- [x] **Milestone 6: Hybrid Retrieval** — Dense + sparse fusion via Reciprocal Rank Fusion (RRF).
+- [x] **Milestone 7: Reranking** — Cross-encoder reranking for improved candidate relevance.
+- [x] **Milestone 8: RAG & Evidence-Grounded Answers** — Local LLM synthesis with strict index-based citation verification.
+- [ ] **Milestone 9: Structured Research Extraction** — Extracting methods, datasets, and claims *(In Progress)*.
+- [ ] **Milestone 10: Literature Comparison** — Systematically comparing multiple approaches.
+- [ ] **Milestone 11-13: Research Planning & Agents** — Tool calling, multi-step reasoning, and workflows.
+- [ ] **Milestone 14-16: Evaluation & Experimentation** — Experiment tracking and quantitative AI evaluation.
+- [ ] **Milestone 17-19: Advanced Graph & Production** — Knowledge graphs, advanced scaling, and productionization.
 
 ---
 
@@ -97,6 +122,7 @@ Development follows a strict milestone discipline where every AI addition is eva
 ### Prerequisites
 - Python 3.11+
 - PostgreSQL instance running locally or via Docker
+- Ollama installed locally for LLM generation
 
 ### 1. Clone the repository
 ```bash
@@ -133,6 +159,7 @@ Interactive API documentation will be available at:
 - ReDoc: `http://localhost:8000/redoc`
 
 ### 6. Run Tests
+The project uses strict transactional rollback isolation for testing. Ensure your test database exists, then run:
 ```bash
 pytest backend/tests
 ```
