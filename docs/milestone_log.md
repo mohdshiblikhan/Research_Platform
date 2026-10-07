@@ -22,8 +22,8 @@
 | 5 | Semantic Retrieval | ✅ Completed | [m05_semantic_retrieval.md](milestones/m05_semantic_retrieval.md) |
 | 6 | Hybrid Retrieval | ✅ Completed | [m06_hybrid_retrieval.md](milestones/m06_hybrid_retrieval.md) |
 | 7 | Reranking | ✅ Completed | [m07_reranking.md](milestones/m07_reranking.md) |
-| 8 | RAG & Evidence-Grounded Answers | 🔄 In Progress | (coming soon) |
-| 9 | Structured Research Extraction | ⏳ Upcoming | — |
+| 8 | RAG & Evidence-Grounded Answers | ✅ Completed | [m08_rag.md](milestones/m08_rag.md) |
+| 9 | Structured Research Extraction | 🔄 In Progress | (coming soon) |
 | 10 | Literature Comparison | ⏳ Upcoming | — |
 | 11 | Research Planning | ⏳ Upcoming | — |
 | 12 | Tool Calling | ⏳ Upcoming | — |
@@ -117,6 +117,16 @@
 **What was built**: Introduced a two-stage retrieval architecture by integrating a Cross-Encoder reranker (`cross-encoder/ms-marco-MiniLM-L-6-v2`) via `RerankingService`. Added an orthogonal `rerank: bool` flag to `GET /api/projects/{project_id}/search` and extended `SearchResultItem` with `rerank_score`. When enabled, `SearchService` retrieves an internal candidate pool of 60 items from the first-stage retriever (keyword, semantic, or hybrid), computes full cross-attention relevance scores, sorts candidates descending by `rerank_score`, and slices the pagination window (`offset` and `limit`) post-rerank. 9 new unit and integration tests, 77 total tests passing, 0 regressions.
 
 **Key Architectural Decision**: **Orthogonal boolean flag over dedicated mode & Post-rerank pagination** — Reranking was exposed as a `rerank: bool` parameter rather than a `mode="rerank"` or `mode="hybrid_rerank"` to allow layering over any first-stage retriever (keyword, semantic, or hybrid) without combinatorial explosion of search modes. For pagination, `SearchService` deliberately fetches a fixed pool of 60 candidates before reranking and applies the caller's pagination slice *after* scoring and sorting, ensuring the reranker always evaluates a healthy candidate pool regardless of requested page depth. Unit and API tests mock the CrossEncoder for deterministic, sub-second CI validation, separating structural correctness testing from model quality evaluation.
+
+---
+
+### Milestone 8 — RAG & Evidence-Grounded Answers
+**Version**: `v0.8` | **Migration**: None (App level changes only)  
+**Full Chronicle**: [m08_rag.md](milestones/m08_rag.md)
+
+**What was built**: Introduced Retrieval-Augmented Generation (RAG) to answer questions directly from documents. Created an abstract `LLMService` and an implementation for local generation via Ollama. Built the `RAGService` orchestrator that retrieves evidence (using Hybrid + Rerank), formats a strict JSON-mode system prompt, and parses the LLM's response. Added a new `POST /api/projects/{project_id}/ask` endpoint that returns a deeply structured payload including `evidence_analysis`, the synthesized `answer`, verified `citations` mapped to database chunk IDs, and latency metrics. Added 5 integration tests mocking the LLM to ensure deterministic CI validation. 82 total tests passing.
+
+**Key Architectural Decision**: **Single-Call Chain-of-Thought with Strict JSON** — By requiring the LLM to return JSON with an `evidence_analysis` field *before* the `answer` field, the model is forced to evaluate the evidence autoregressively before synthesizing its conclusion. This delivers the reasoning quality of multi-step agentic workflows without the 2x latency/cost penalty. **Index-based Citation Verification** was implemented at the orchestrator level to actively catch and strip hallucinated citation indices, maintaining complete provenance back to the original PDF chunks.
 
 ---
 
