@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.endpoints import projects, documents, processing, search, embedding, rag
+from app.api.endpoints import projects, documents, processing, search, embedding, rag, comparison
 
 router = APIRouter()
 
@@ -10,3 +10,4 @@ router.include_router(processing.router)
 router.include_router(search.router)
 router.include_router(embedding.router)
 router.include_router(rag.router)
+router.include_router(comparison.router)
