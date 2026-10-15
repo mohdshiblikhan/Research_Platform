@@ -140,4 +140,14 @@
 
 ---
 
+### Milestone 10 — Literature Comparison
+**Version**: `v1.0` | **Migration**: None (App level changes only)  
+**Full Chronicle**: [m10_literature_comparison.md](milestones/m10_literature_comparison.md)
+
+**What was built**: Implemented a multi-document literature comparison engine. Added the `POST /api/projects/{project_id}/compare` endpoint, accepting 2-10 document IDs and an optional `include_synthesis` boolean flag. Added bulk-fetch querying (`get_by_document_ids`) to `ExtractionRepository` for O(1) database lookups. Created `ComparisonService` to deterministically assemble an 8-field tabular comparison matrix across documents and optionally orchestrate an analytical LLM synthesis summarizing key differences, common themes, conflicting findings, and research gaps. 10 new integration tests written, 95 total tests passing, 0 regressions.
+
+**Key Architectural Decision**: **Hybrid comparison (Deterministic Matrix + Optional LLM Synthesis)**: Assembly of the comparison table is treated as a pure, fast, deterministic data transformation reading directly from PostgreSQL relational columns, eliminating LLM latency and hallucination risks for tabular views. LLM synthesis is decoupled as an optional flag that feeds on the compact, structured extraction fields (~500 tokens) rather than raw paper chunks, drastically reducing inference latency and context overflow risks.
+
+---
+
 *(Add each new milestone summary here after its deep-dive file is written.)*
