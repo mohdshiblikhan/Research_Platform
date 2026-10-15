@@ -23,8 +23,8 @@
 | 6 | Hybrid Retrieval | ✅ Completed | [m06_hybrid_retrieval.md](milestones/m06_hybrid_retrieval.md) |
 | 7 | Reranking | ✅ Completed | [m07_reranking.md](milestones/m07_reranking.md) |
 | 8 | RAG & Evidence-Grounded Answers | ✅ Completed | [m08_rag.md](milestones/m08_rag.md) |
-| 9 | Structured Research Extraction | 🔄 In Progress | (coming soon) |
-| 10 | Literature Comparison | ⏳ Upcoming | — |
+| 9 | Structured Research Extraction | ✅ Completed | [m09_structured_extraction.md](milestones/m09_structured_extraction.md) |
+| 10 | Literature Comparison | 🔄 In Progress | — |
 | 11 | Research Planning | ⏳ Upcoming | — |
 | 12 | Tool Calling | ⏳ Upcoming | — |
 | 13 | Agentic Research Workflow | ⏳ Upcoming | — |
@@ -127,6 +127,16 @@
 **What was built**: Introduced Retrieval-Augmented Generation (RAG) to answer questions directly from documents. Created an abstract `LLMService` and an implementation for local generation via Ollama. Built the `RAGService` orchestrator that retrieves evidence (using Hybrid + Rerank), formats a strict JSON-mode system prompt, and parses the LLM's response. Added a new `POST /api/projects/{project_id}/ask` endpoint that returns a deeply structured payload including `evidence_analysis`, the synthesized `answer`, verified `citations` mapped to database chunk IDs, and latency metrics. Added 5 integration tests mocking the LLM to ensure deterministic CI validation. 82 total tests passing.
 
 **Key Architectural Decision**: **Single-Call Chain-of-Thought with Strict JSON** — By requiring the LLM to return JSON with an `evidence_analysis` field *before* the `answer` field, the model is forced to evaluate the evidence autoregressively before synthesizing its conclusion. This delivers the reasoning quality of multi-step agentic workflows without the 2x latency/cost penalty. **Index-based Citation Verification** was implemented at the orchestrator level to actively catch and strip hallucinated citation indices, maintaining complete provenance back to the original PDF chunks.
+
+---
+
+### Milestone 9 — Structured Research Extraction
+**Version**: `v0.9` | **Migration**: `2bb26245693e`  
+**Full Chronicle**: [m09_structured_extraction.md](milestones/m09_structured_extraction.md)
+
+**What was built**: Introduced the `DocumentExtraction` entity to move beyond simple document chunking. Created an extraction pipeline that fetches the most information-dense sections of a document (using edge chunks + hybrid semantic search) and feeds them to an LLM running in strict JSON mode to extract structured metadata fields like `research_problem`, `methodology`, `datasets`, and `evaluation_metrics`. Implemented the `POST /api/projects/{project_id}/documents/{document_id}/extract` API to trigger this process. 3 new integration tests written, passing successfully.
+
+**Key Architectural Decision**: **Dedicated DB Schema over JSONB**: Added a new `document_extractions` table with explicitly typed `Text` columns for extraction fields, rather than just dumping JSON into a `JSONB` column. This enforces structure and sets up the ability to query, index, and systematically compare methodologies and datasets across multiple papers in Milestone 10. **Hybrid Context Gathering**: To handle LLM context limits efficiently, the `ExtractionService` concatenates the first 3 chunks (Abstract/Intro), the last 3 chunks (Conclusion/Limitations), and the top 5 chunks returned from a hybrid semantic search for methodology keywords. This avoids the cost and fragility of running Map-Reduce across the entire paper while ensuring critical insights are not missed.
 
 ---
 
