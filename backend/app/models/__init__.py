@@ -4,3 +4,4 @@ from app.db.base_class import Base
 from app.models.project import Project
 from app.models.document import Document
 from app.models.chunk import Chunk
+from app.models.extraction import DocumentExtraction

@@ -8,6 +8,7 @@ from app.db.base_class import Base
 
 if TYPE_CHECKING:
     from app.models.project import Project
+    from app.models.extraction import DocumentExtraction
 
 
 class DocumentStatus(str, enum.Enum):
@@ -42,3 +43,6 @@ class Document(Base):
     )
 
     project: Mapped["Project"] = relationship(back_populates="documents")
+    extraction: Mapped[Optional["DocumentExtraction"]] = relationship(
+        back_populates="document", uselist=False, cascade="all, delete-orphan"
+    )
