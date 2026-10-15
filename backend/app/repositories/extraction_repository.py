@@ -17,6 +17,14 @@ class ExtractionRepository:
         result = self.db.execute(stmt)
         return result.scalars().first()
 
+    def get_by_document_ids(self, document_ids: list[int]) -> list[DocumentExtraction]:
+        """Get extractions for multiple documents in a single query."""
+        if not document_ids:
+            return []
+        stmt = select(DocumentExtraction).where(DocumentExtraction.document_id.in_(document_ids))
+        result = self.db.execute(stmt)
+        return list(result.scalars().all())
+
     def upsert(
         self, 
         document_id: int, 
