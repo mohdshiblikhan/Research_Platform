@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.document import DocumentRead
+from app.schemas.extraction import ExtractionRead, ExtractionWithRawRead
 from app.services.document_service import DocumentService
+from app.services.extraction_service import ExtractionService
 
 router = APIRouter(prefix="/projects", tags=["Documents"])
 
@@ -60,5 +62,35 @@ def delete_document(project_id: int, document_id: int, db: Session = Depends(get
     service = DocumentService(db)
     try:
         service.delete_document(project_id, document_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post("/{project_id}/documents/{document_id}/extract", response_model=ExtractionRead)
+def extract_structured_data(
+    project_id: int, 
+    document_id: int, 
+    db: Session = Depends(get_db)
+):
+    """Extract structured information (methods, datasets, etc.) from a document."""
+    service = ExtractionService(db)
+    try:
+        return service.extract(project_id, document_id)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/{project_id}/documents/{document_id}/extract", response_model=ExtractionWithRawRead)
+def get_extracted_data(
+    project_id: int, 
+    document_id: int, 
+    db: Session = Depends(get_db)
+):
+    """Get previously extracted structured information for a document."""
+    service = ExtractionService(db)
+    try:
+        return service.get_extraction(project_id, document_id)
     except FileNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
