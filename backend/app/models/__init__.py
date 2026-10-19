@@ -5,3 +5,4 @@ from app.models.project import Project
 from app.models.document import Document
 from app.models.chunk import Chunk
 from app.models.extraction import DocumentExtraction
+from app.models.research_plan import ResearchPlan
