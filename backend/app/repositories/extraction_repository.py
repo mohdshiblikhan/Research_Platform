@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.document import Document
 from app.models.extraction import DocumentExtraction
 from app.schemas.extraction import ExtractionCreate
 
@@ -22,6 +23,16 @@ class ExtractionRepository:
         if not document_ids:
             return []
         stmt = select(DocumentExtraction).where(DocumentExtraction.document_id.in_(document_ids))
+        result = self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    def get_by_project_id(self, project_id: int) -> list[DocumentExtraction]:
+        """Get all extractions for documents belonging to a specific project."""
+        stmt = (
+            select(DocumentExtraction)
+            .join(Document, DocumentExtraction.document_id == Document.id)
+            .where(Document.project_id == project_id)
+        )
         result = self.db.execute(stmt)
         return list(result.scalars().all())
 
