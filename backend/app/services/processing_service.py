@@ -198,12 +198,16 @@ class ProcessingService:
         """Normalize extracted PDF text.
 
         Handles:
+        - Strip NUL (0x00) bytes incompatible with PostgreSQL text fields
         - Collapse multiple spaces into one
         - Collapse 3+ newlines into 2 (preserve paragraph breaks)
         - Strip leading/trailing whitespace
         - Rejoin hyphenated words at line breaks (e.g., "com-\\nputer" → "computer")
         """
         text = raw_text
+
+        # Remove null bytes (PostgreSQL VARCHAR/TEXT cannot contain \x00)
+        text = text.replace("\x00", "")
 
         # Rejoin hyphenated words split across lines
         text = re.sub(r"(\w)-\n(\w)", r"\1\2", text)

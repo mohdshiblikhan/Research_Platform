@@ -309,3 +309,19 @@ def test_delete_document_removes_chunks(
         f"/api/projects/{project_id}/documents/{doc['id']}/chunks"
     )
     assert chunks_response.status_code == 404
+
+
+# ── NULL BYTE SANITIZATION ──────────────────────────────────────────────────
+
+
+def test_clean_text_strips_null_bytes(db_session):
+    """Ensure _clean_text removes null (0x00) bytes unsupported by PostgreSQL."""
+    from app.services.processing_service import ProcessingService
+
+    service = ProcessingService(db_session)
+    raw = "Section 1\x00:\nIntroduction with NUL\x00 byte\x00s."
+    cleaned = service._clean_text(raw)
+    assert "\x00" not in cleaned
+    assert "Section 1:" in cleaned
+    assert "Introduction with NUL bytes." in cleaned
+
