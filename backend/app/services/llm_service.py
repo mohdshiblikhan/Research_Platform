@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
+from typing import Any, Optional
 from pydantic import BaseModel
-from typing import Optional
+
+from app.schemas.tool import ToolCall
 
 
 class LLMResponse(BaseModel):
@@ -10,6 +12,7 @@ class LLMResponse(BaseModel):
     prompt_tokens: Optional[int] = None    # Input token count
     completion_tokens: Optional[int] = None # Output token count
     total_tokens: Optional[int] = None     # Total token count
+    tool_calls: Optional[list[ToolCall]] = None # Tool calls requested by LLM
 
 
 class LLMService(ABC):
@@ -23,6 +26,7 @@ class LLMService(ABC):
         temperature: float = 0.1,
         max_tokens: int = 2000,
         json_mode: bool = False,
+        tools: Optional[list[dict[str, Any]]] = None,
     ) -> LLMResponse:
         """Generate a completion from the LLM.
 
@@ -32,9 +36,10 @@ class LLMService(ABC):
             temperature: Randomness control (0.0 = deterministic).
             max_tokens: Maximum response length.
             json_mode: If True, force JSON-formatted output.
+            tools: Optional list of tool definitions in OpenAI/Ollama function format.
 
         Returns:
-            LLMResponse with generated content and metadata.
+            LLMResponse with generated content, metadata, and optional tool_calls.
         """
         pass
 
