@@ -26,8 +26,8 @@
 | 9 | Structured Research Extraction | ✅ Completed | [m09_structured_extraction.md](milestones/m09_structured_extraction.md) |
 | 10 | Literature Comparison | ✅ Completed | [m10_literature_comparison.md](milestones/m10_literature_comparison.md) |
 | 11 | Research Planning | ✅ Completed | [m11_research_planning.md](milestones/m11_research_planning.md) |
-| 12 | Tool Calling | 🔄 In Progress | — |
-| 13 | Agentic Research Workflow | ⏳ Upcoming | — |
+| 12 | Tool Calling | ✅ Completed | [m12_tool_calling.md](milestones/m12_tool_calling.md) |
+| 13 | Agentic Research Workflow | 🔄 In Progress | — |
 | 14 | Experiment Planning & Tracking | ⏳ Upcoming | — |
 | 15 | Experiment Comparison | ⏳ Upcoming | — |
 | 16 | AI / RAG / Agent Evaluation | ⏳ Upcoming | — |
@@ -157,6 +157,16 @@
 **What was built**: Introduced an evidence-driven Research Planning engine that converts a research question into a structured, verifiable research plan (Gap → Hypothesis → Experiment chain). Implemented `ResearchPlanningService` orchestrating Option C context assembly (structured extractions + analytical comparison synthesis + hybrid-retrieved evidence passages with source provenance). Built `POST /api/projects/{id}/plan`, `GET /api/projects/{id}/plans`, and `GET /api/projects/{id}/plans/{id}` endpoints. Persisted all plans into a versioned `research_plans` table using JSONB and relational foreign keys. 14 new integration tests, 110 total tests passing, 0 regressions.
 
 **Key Architectural Decision**: **Option C Context Assembly with Provenance & Scope Consistency**: The planner combines macro-level paper extractions (M9), cross-paper synthesis (M10), and micro-level verbatim evidence passages (M6/M7) bounded strictly to the analyzed documents. Guardrails in the prompt and schema prevent the "unobserved topic fallacy" by requiring verifiable observations for gaps and linking every experiment to a hypothesis and gap ID.
+
+---
+
+### Milestone 12 — Tool Calling
+**Version**: `v1.2` | **Migration**: None (App level changes only)  
+**Full Chronicle**: [m12_tool_calling.md](milestones/m12_tool_calling.md)
+
+**What was built**: Introduced a declarative, sandboxed, and auditable Tool-Calling Layer wrapping existing platform capabilities. Built a modular `BaseTool` class hierarchy and central `ToolRegistry` pre-populated with 8 safe analytical tools (`search_chunks`, `get_chunk`, `list_documents`, `get_document_metadata`, `get_paper_extraction`, `compare_papers`, `get_research_plan`, `list_research_plans`). Built `ToolExecutionService` for Pydantic argument validation, timing, logging, and error containment. Extended `LLMService` and `OllamaLLMService` to support native tool schemas and parse `ToolCall` responses. Added `GET /api/projects/{p_id}/tools` and `POST /api/projects/{p_id}/tools/execute` REST endpoints. 16 new integration and unit tests, 126 total tests passing, 0 regressions.
+
+**Key Architectural Decision**: **Server-Injected `ToolContext` & Dual-Representation Output**: To prevent cross-project hallucination or data leakage, `project_id` is never exposed in the LLM's tool parameter schema; it is strictly injected by the server runtime. Every tool produces a `ToolResult` with dual representations: a token-optimized, human/LLM-readable text summary preserving chunk and page provenance for context windows, alongside the full structured JSON payload for application rendering and programmatic auditing.
 
 ---
 
