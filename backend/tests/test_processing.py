@@ -325,3 +325,80 @@ def test_clean_text_strips_null_bytes(db_session):
     assert "Section 1:" in cleaned
     assert "Introduction with NUL bytes." in cleaned
 
+
+# ── RECURSIVE CHUNKING & BOUNDARY TESTS ─────────────────────────────────────
+
+
+def test_chunks_respect_paragraph_boundaries(db_session):
+    """Recursive chunking should split along paragraph boundaries rather than arbitrary offsets."""
+    from app.services.processing_service import ProcessingService, PageText
+
+    service = ProcessingService(db_session)
+    p1 = "Paragraph 1: Information retrieval is the science of searching for documents and metadata."
+    p2 = "Paragraph 2: Vector search uses dense embeddings to capture semantic similarity between texts."
+    p3 = "Paragraph 3: Hybrid search combines dense retrieval with sparse keyword matching algorithms."
+    full_text = f"{p1}\n\n{p2}\n\n{p3}"
+
+    pages = [PageText(page_number=1, text=full_text)]
+    chunk_size = len(p1) + 20
+    chunks = service._chunk_text(pages, chunk_size=chunk_size, chunk_overlap=0)
+
+    assert len(chunks) == 3
+    assert chunks[0].content == p1
+    assert chunks[1].content == p2
+    assert chunks[2].content == p3
+    assert chunks[0].chunk_index == 0
+    assert chunks[1].chunk_index == 1
+    assert chunks[2].chunk_index == 2
+    for c in chunks:
+        assert c.page_start == 1
+        assert c.page_end == 1
+
+
+def test_recursive_chunking_falls_back_to_sentences(db_session):
+    """When a single paragraph exceeds chunk_size, splitting falls back to sentence boundaries."""
+    from app.services.processing_service import ProcessingService, PageText
+
+    service = ProcessingService(db_session)
+    s1 = "Sentence 1 describes the research problem in great detail."
+    s2 = "Sentence 2 elaborates on the empirical methodology and experiments."
+    s3 = "Sentence 3 summarizes the conclusions and future directions."
+    para = f"{s1} {s2} {s3}"
+
+    pages = [PageText(page_number=1, text=para)]
+    chunk_size = len(s1) + 15
+    chunks = service._chunk_text(pages, chunk_size=chunk_size, chunk_overlap=0)
+
+    assert len(chunks) >= 2
+    # The first chunk should end with a clean sentence end (period)
+    assert chunks[0].content.endswith(".")
+    reconstructed = " ".join(c.content for c in chunks)
+    assert s1 in reconstructed
+    assert s2 in reconstructed
+
+
+def test_chunk_method_config_toggle(db_session, monkeypatch):
+    """Verify that chunk_method setting correctly toggles between recursive and fixed methods."""
+    from app.core.config import settings
+    from app.services.processing_service import ProcessingService, PageText
+
+    service = ProcessingService(db_session)
+    text = "First paragraph here.\n\nSecond paragraph here.\n\nThird paragraph here."
+    pages = [PageText(page_number=1, text=text)]
+
+    # Test recursive method
+    monkeypatch.setattr(settings, "chunk_method", "recursive")
+    recursive_chunks = service._chunk_text(pages, chunk_size=35, chunk_overlap=5)
+    assert len(recursive_chunks) >= 2
+    assert recursive_chunks[0].chunk_index == 0
+    assert recursive_chunks[0].char_offset_start == 0
+
+    # Test fixed method
+    monkeypatch.setattr(settings, "chunk_method", "fixed")
+    fixed_chunks = service._chunk_text(pages, chunk_size=35, chunk_overlap=5)
+    assert len(fixed_chunks) >= 2
+    assert fixed_chunks[0].chunk_index == 0
+    assert fixed_chunks[0].char_offset_start == 0
+    assert fixed_chunks[0].char_offset_end == 35
+
+
