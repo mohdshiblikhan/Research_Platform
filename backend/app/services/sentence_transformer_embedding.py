@@ -1,3 +1,4 @@
+from app.core.config import settings
 from app.services.embedding_service import EmbeddingService
 
 
@@ -11,7 +12,9 @@ class SentenceTransformerEmbeddingService(EmbeddingService):
         self._dimension = self._model.get_embedding_dimension()
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        embeddings = self._model.encode(texts, batch_size=64, show_progress_bar=False)
+        embeddings = self._model.encode(
+            texts, batch_size=settings.embedding_batch_size, show_progress_bar=False
+        )
         return embeddings.tolist()
 
     def embed_query(self, query: str) -> list[float]:
