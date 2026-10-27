@@ -27,8 +27,8 @@
 | 10 | Literature Comparison | ✅ Completed | [m10_literature_comparison.md](milestones/m10_literature_comparison.md) |
 | 11 | Research Planning | ✅ Completed | [m11_research_planning.md](milestones/m11_research_planning.md) |
 | 12 | Tool Calling | ✅ Completed | [m12_tool_calling.md](milestones/m12_tool_calling.md) |
-| 13 | Agentic Research Workflow | 🔄 In Progress | — |
-| 14 | Experiment Planning & Tracking | ⏳ Upcoming | — |
+| 13 | Agentic Research Workflow | ✅ Completed | [m13_agentic_research_workflow.md](milestones/m13_agentic_research_workflow.md) |
+| 14 | Experiment Planning & Tracking | 🔄 In Progress | — |
 | 15 | Experiment Comparison | ⏳ Upcoming | — |
 | 16 | AI / RAG / Agent Evaluation | ⏳ Upcoming | — |
 | 17 | Knowledge Graph | ⏳ Upcoming | — |
@@ -167,6 +167,16 @@
 **What was built**: Introduced a declarative, sandboxed, and auditable Tool-Calling Layer wrapping existing platform capabilities. Built a modular `BaseTool` class hierarchy and central `ToolRegistry` pre-populated with 8 safe analytical tools (`search_chunks`, `get_chunk`, `list_documents`, `get_document_metadata`, `get_paper_extraction`, `compare_papers`, `get_research_plan`, `list_research_plans`). Built `ToolExecutionService` for Pydantic argument validation, timing, logging, and error containment. Extended `LLMService` and `OllamaLLMService` to support native tool schemas and parse `ToolCall` responses. Added `GET /api/projects/{p_id}/tools` and `POST /api/projects/{p_id}/tools/execute` REST endpoints. 16 new integration and unit tests, 126 total tests passing, 0 regressions.
 
 **Key Architectural Decision**: **Server-Injected `ToolContext` & Dual-Representation Output**: To prevent cross-project hallucination or data leakage, `project_id` is never exposed in the LLM's tool parameter schema; it is strictly injected by the server runtime. Every tool produces a `ToolResult` with dual representations: a token-optimized, human/LLM-readable text summary preserving chunk and page provenance for context windows, alongside the full structured JSON payload for application rendering and programmatic auditing.
+
+---
+
+### Milestone 13 — Agentic Research Workflow
+**Version**: `v1.3` | **Migration**: `d47427ab4920_create_agent_sessions_table.py`  
+**Full Chronicle**: [m13_agentic_research_workflow.md](milestones/m13_agentic_research_workflow.md)
+
+**What was built**: Introduced an autonomous Agentic Research Workflow powered by an adaptive ReAct (Reasoning + Acting) loop. The agent dynamically selects, chains, and dispatches across all 8 platform tools to investigate high-level research questions, persisting observable execution trajectories into PostgreSQL. Implemented multi-dimensional safety boundaries (max 10 iterations, max 25 tool calls, 300s timeout, max 3 consecutive errors), duplicate tool call skipping, observation truncation (1,500 chars), context budget pruning, intermediate trajectory checkpointing every 3 iterations, and forced final answer synthesis with `json_mode=True`. Extended `LLMService` with multi-turn `generate_chat()`. Added `POST /api/projects/{p_id}/agent/research`, `GET /api/projects/{p_id}/agent/sessions`, and `GET /api/projects/{p_id}/agent/sessions/{s_id}` endpoints. 20 new unit and integration tests, 146 total tests passing, 0 regressions.
+
+**Key Architectural Decision**: **Single Adaptive ReAct Loop with Multi-Dimensional Stopping & Checkpointing**: Rather than hard-coding brittle sequential graphs (Discovery -> Extraction -> Comparison -> Synthesis), a single adaptive ReAct loop with heuristic guidance in the prompt allows the agent to self-direct its exploration path. Runaway execution is prevented by 4 orthogonal limits, duplicate calls are skipped via canonical signature hashing, and partial progress is safely checkpointed to PostgreSQL every 3 iterations, ensuring resilience on long research tasks.
 
 ---
 
