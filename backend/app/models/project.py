@@ -5,6 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base
 
 if TYPE_CHECKING:
+    from app.models.agent_session import AgentSession
     from app.models.document import Document
     from app.models.research_plan import ResearchPlan
 
@@ -19,5 +20,8 @@ class Project(Base):
         back_populates="project", cascade="all, delete-orphan"
     )
     research_plans: Mapped[list["ResearchPlan"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    agent_sessions: Mapped[list["AgentSession"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
