@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     rag_default_search_mode: str = "hybrid" # Default retrieval mode
     rag_default_rerank: bool = True         # Rerank by default
 
+    # Agent Configuration (Milestone 13)
+    agent_max_iterations: int = 10
+    agent_max_tool_calls: int = 25
+    agent_max_time_seconds: int = 300
+    agent_max_observation_chars: int = 1500
+    agent_context_budget_tokens: int = 6000
+    agent_checkpoint_interval: int = 3
+    agent_force_final_after_max: bool = True
+    agent_max_consecutive_errors: int = 3
+
     model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()
