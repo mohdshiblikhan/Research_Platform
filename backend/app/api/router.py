@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.endpoints import projects, documents, processing, search, embedding, rag, comparison, research_planning, tools, agent
+from app.api.endpoints import projects, documents, processing, search, embedding, rag, comparison, research_planning, tools, agent, experiments
 
 router = APIRouter()
 
@@ -14,3 +14,4 @@ router.include_router(comparison.router)
 router.include_router(research_planning.router)
 router.include_router(tools.router)
 router.include_router(agent.router)
+router.include_router(experiments.router)
