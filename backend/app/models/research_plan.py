@@ -7,6 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base
 
 if TYPE_CHECKING:
+    from app.models.experiment import Experiment
     from app.models.project import Project
 
 
@@ -33,3 +34,4 @@ class ResearchPlan(Base):
 
     # Relationships
     project: Mapped["Project"] = relationship(back_populates="research_plans")
+    experiments: Mapped[list["Experiment"]] = relationship(back_populates="research_plan")

@@ -7,6 +7,7 @@ from app.db.base_class import Base
 if TYPE_CHECKING:
     from app.models.agent_session import AgentSession
     from app.models.document import Document
+    from app.models.experiment import Experiment
     from app.models.research_plan import ResearchPlan
 
 
@@ -23,5 +24,8 @@ class Project(Base):
         back_populates="project", cascade="all, delete-orphan"
     )
     agent_sessions: Mapped[list["AgentSession"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    experiments: Mapped[list["Experiment"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )

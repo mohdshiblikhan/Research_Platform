@@ -7,3 +7,23 @@ from app.models.chunk import Chunk
 from app.models.extraction import DocumentExtraction
 from app.models.research_plan import ResearchPlan
 from app.models.agent_session import AgentSession
+from app.models.experiment import (
+    Experiment,
+    ExperimentPriority,
+    ExperimentStatus,
+    HypothesisVerdict,
+)
+
+__all__ = [
+    "Base",
+    "Project",
+    "Document",
+    "Chunk",
+    "DocumentExtraction",
+    "ResearchPlan",
+    "AgentSession",
+    "Experiment",
+    "ExperimentStatus",
+    "ExperimentPriority",
+    "HypothesisVerdict",
+]
