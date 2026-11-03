@@ -28,7 +28,7 @@
 | 11 | Research Planning | ✅ Completed | [m11_research_planning.md](milestones/m11_research_planning.md) |
 | 12 | Tool Calling | ✅ Completed | [m12_tool_calling.md](milestones/m12_tool_calling.md) |
 | 13 | Agentic Research Workflow | ✅ Completed | [m13_agentic_research_workflow.md](milestones/m13_agentic_research_workflow.md) |
-| 14 | Experiment Planning & Tracking | 🔄 In Progress | — |
+| 14 | Experiment Planning & Tracking | ✅ Completed | [m14_experiment_tracking.md](milestones/m14_experiment_tracking.md) |
 | 15 | Experiment Comparison | ⏳ Upcoming | — |
 | 16 | AI / RAG / Agent Evaluation | ⏳ Upcoming | — |
 | 17 | Knowledge Graph | ⏳ Upcoming | — |
@@ -177,6 +177,16 @@
 **What was built**: Introduced an autonomous Agentic Research Workflow powered by an adaptive ReAct (Reasoning + Acting) loop. The agent dynamically selects, chains, and dispatches across all 8 platform tools to investigate high-level research questions, persisting observable execution trajectories into PostgreSQL. Implemented multi-dimensional safety boundaries (max 10 iterations, max 25 tool calls, 300s timeout, max 3 consecutive errors), duplicate tool call skipping, observation truncation (1,500 chars), context budget pruning, intermediate trajectory checkpointing every 3 iterations, and forced final answer synthesis with `json_mode=True`. Extended `LLMService` with multi-turn `generate_chat()`. Added `POST /api/projects/{p_id}/agent/research`, `GET /api/projects/{p_id}/agent/sessions`, and `GET /api/projects/{p_id}/agent/sessions/{s_id}` endpoints. 20 new unit and integration tests, 146 total tests passing, 0 regressions.
 
 **Key Architectural Decision**: **Single Adaptive ReAct Loop with Multi-Dimensional Stopping & Checkpointing**: Rather than hard-coding brittle sequential graphs (Discovery -> Extraction -> Comparison -> Synthesis), a single adaptive ReAct loop with heuristic guidance in the prompt allows the agent to self-direct its exploration path. Runaway execution is prevented by 4 orthogonal limits, duplicate calls are skipped via canonical signature hashing, and partial progress is safely checkpointed to PostgreSQL every 3 iterations, ensuring resilience on long research tasks.
+
+---
+
+### Milestone 14 — Experiment Planning & Tracking
+**Version**: `v1.4` | **Migration**: `7792f4a5525d_create_experiments_table.py`  
+**Full Chronicle**: [m14_experiment_tracking.md](milestones/m14_experiment_tracking.md)
+
+**What was built**: Introduced a lightweight, domain-agnostic scientific experiment planning and tracking ledger that connects literature research and structured research plans (Milestone 11) with empirical experiment management. Built a dedicated `experiments` table with foreign keys to `projects` (`ON DELETE CASCADE`) and `research_plans` (`ON DELETE SET NULL`). Implemented dual creation workflows: unified batch/selective plan promotion via `POST /api/projects/{p_id}/experiments/promote` and unrestricted manual experiment recording across any initial status (`draft`, `planned`, `in_progress`, `completed`, `abandoned`) via `POST /api/projects/{p_id}/experiments`. Uniformly enforced strict completion outcome validation (requiring non-empty quantitative results OR qualitative findings with a summary, or both) across creation, status updates, and results logging. Implemented contextual provenance verification for gap IDs, document IDs, and hypothesis IDs against actual project data. Built selective results replacement, reopening logic clearing completion timestamps, and registered two secondary read-only agent tools (`list_experiments`, `get_experiment`) for the Milestone 13 research agent. 18 new unit, integration, lifecycle, and tool tests written; 164 total tests passing, 0 regressions.
+
+**Key Architectural Decision**: **Hybrid Relational Core with JSONB Attributes & Domain-Agnostic Outcomes**: Avoided monolithic JSON blobs and rigid tabular schemas by splitting experiment data into indexed, strictly typed relational columns for invariants (`status`, `priority`, `hypothesis_verdict`, timestamps, FKs) alongside validated, open-ended JSONB columns for flexible datasets, variables, hyperparameters, metric results, and qualitative findings. The platform treats quantitative metrics and qualitative findings as independently optional first-class outcomes, supporting exploratory, theoretical, and qualitative research without forcing artificial benchmark metrics or execution engines.
 
 ---
 
