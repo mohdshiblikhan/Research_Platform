@@ -3,6 +3,7 @@ from typing import Optional
 
 from sentence_transformers import CrossEncoder
 
+from app.core.config import settings
 from app.schemas.search import SearchResultItem
 
 logger = logging.getLogger(__name__)
@@ -13,14 +14,15 @@ class RerankingService:
     Reranks search results using a CrossEncoder model.
     """
 
-    def __init__(self, model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
+    def __init__(self, model_name: Optional[str] = None):
         """Initialize the RerankingService.
 
         Args:
             model_name: The HuggingFace model identifier for the cross-encoder.
         """
-        logger.info(f"Initializing RerankingService with model: {model_name}")
-        self.model = CrossEncoder(model_name)
+        chosen_model = model_name or settings.reranking_model
+        logger.info(f"Initializing RerankingService with model: {chosen_model}")
+        self.model = CrossEncoder(chosen_model)
 
     def rerank(self, query: str, results: list[SearchResultItem]) -> list[SearchResultItem]:
         """

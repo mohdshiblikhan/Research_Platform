@@ -44,7 +44,7 @@ class ProcessingService:
         2. Set status → 'processing'
         3. Extract text from each PDF page (PyMuPDF)
         4. Clean the extracted text
-        5. Chunk the text with fixed-size + overlap
+        5. Chunk the text with recursive boundary-aware splitting (or fixed-size window)
         6. Bulk insert chunks into the database
         7. Set status → 'processed'
 
@@ -223,20 +223,27 @@ class ProcessingService:
 
         return text
 
+    SEPARATORS: list[str] = ["\n\n", "\n", ". ", " ", ""]
+
     def _chunk_text(
         self,
         pages: list[PageText],
         chunk_size: int,
         chunk_overlap: int,
     ) -> list[ChunkData]:
-        """Split page texts into fixed-size chunks with overlap.
+        """Split page texts into chunks using recursive separator hierarchy.
 
         Strategy:
             1. Concatenate all page texts, tracking page boundaries.
-            2. Slide a window of `chunk_size` characters with a step
-               of `chunk_size - chunk_overlap`.
-            3. For each chunk, determine which page(s) it spans by
-               checking its char offsets against page boundaries.
+            2. If configured to 'fixed', use fixed-size sliding window.
+            3. Otherwise, recursively split text using separator hierarchy:
+               - Paragraph breaks ("\\n\\n")
+               - Line breaks ("\\n")
+               - Sentence endings (". ")
+               - Word boundaries (" ")
+               - Character level as last resort ("")
+            4. Merge splits up to chunk_size and apply overlap.
+            5. Preserve page provenance via char offset tracking.
 
         Returns:
             List of ChunkData objects ready for DB insertion.
@@ -265,7 +272,160 @@ class ProcessingService:
         if not full_text:
             return []
 
-        # Slide the chunking window
+        # If configured for legacy fixed chunking, run legacy window logic
+        if getattr(settings, "chunk_method", "recursive") == "fixed":
+            return self._fixed_chunk_text(
+                full_text=full_text,
+                page_boundaries=page_boundaries,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+            )
+
+        # Recursive text splitting
+        splits = self._recursive_split(full_text, chunk_size, self.SEPARATORS)
+        return self._merge_with_overlap(
+            splits=splits,
+            full_text=full_text,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            page_boundaries=page_boundaries,
+        )
+
+    def _split_text_with_separator(self, text: str, separator: str) -> list[str]:
+        """Split text while keeping the separator with the preceding split."""
+        if not separator:
+            return list(text)
+
+        splits = re.split(f"({re.escape(separator)})", text)
+        parts: list[str] = []
+        for i in range(0, len(splits), 2):
+            part = splits[i]
+            if i + 1 < len(splits):
+                part += splits[i + 1]
+            if part:
+                parts.append(part)
+        return parts
+
+    def _recursive_split(
+        self, text: str, chunk_size: int, separators: list[str]
+    ) -> list[str]:
+        """Recursively split text using separator hierarchy."""
+        if len(text) <= chunk_size:
+            return [text] if text else []
+
+        # Find the first separator present in text
+        chosen_sep = None
+        for sep in separators:
+            if sep and sep in text:
+                chosen_sep = sep
+                break
+
+        # Fallback to character-level slicing if no non-empty separator matches
+        if chosen_sep is None:
+            return [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
+
+        parts = self._split_text_with_separator(text, chosen_sep)
+        remaining_seps = separators[separators.index(chosen_sep) + 1 :]
+
+        result: list[str] = []
+        current = ""
+
+        for part in parts:
+            if not part:
+                continue
+
+            candidate = current + part
+            if len(candidate) <= chunk_size:
+                current = candidate
+            else:
+                if current:
+                    result.append(current)
+                    current = ""
+
+                # If this single part exceeds chunk_size, recursively split it
+                if len(part) > chunk_size:
+                    if remaining_seps:
+                        sub_splits = self._recursive_split(part, chunk_size, remaining_seps)
+                        result.extend(sub_splits)
+                    else:
+                        for i in range(0, len(part), chunk_size):
+                            result.append(part[i : i + chunk_size])
+                else:
+                    current = part
+
+        if current:
+            result.append(current)
+
+        return result
+
+    def _merge_with_overlap(
+        self,
+        splits: list[str],
+        full_text: str,
+        chunk_size: int,
+        chunk_overlap: int,
+        page_boundaries: list[tuple[int, int, int]],
+    ) -> list[ChunkData]:
+        """Convert splits into ChunkData with overlap and page provenance."""
+        chunks: list[ChunkData] = []
+        current_offset = 0
+
+        for i, split_text in enumerate(splits):
+            if not split_text:
+                continue
+
+            found = full_text.find(split_text, current_offset)
+            if found != -1:
+                offset_start = found
+            else:
+                offset_start = current_offset
+
+            raw_end = offset_start + len(split_text)
+
+            # Apply overlap: prepend tail of previous chunk's text
+            if i > 0 and chunk_overlap > 0:
+                overlap_start = max(0, offset_start - chunk_overlap)
+                if chunks:
+                    overlap_start = max(chunks[-1].char_offset_start, overlap_start)
+                effective_start = overlap_start
+            else:
+                effective_start = offset_start
+
+            raw_content = full_text[effective_start:raw_end]
+            content = raw_content.rstrip()
+            if not content:
+                current_offset = raw_end
+                continue
+
+            offset_end = effective_start + len(content)
+
+            page_start = self._find_page_at_offset(effective_start, page_boundaries)
+            page_end = self._find_page_at_offset(
+                max(effective_start, offset_end - 1), page_boundaries
+            )
+
+            chunks.append(
+                ChunkData(
+                    chunk_index=len(chunks),
+                    content=content,
+                    page_start=page_start,
+                    page_end=page_end,
+                    char_offset_start=effective_start,
+                    char_offset_end=offset_end,
+                )
+            )
+            current_offset = raw_end
+
+        return chunks
+
+    def _fixed_chunk_text(
+        self,
+        full_text: str,
+        page_boundaries: list[tuple[int, int, int]],
+        chunk_size: int,
+        chunk_overlap: int,
+    ) -> list[ChunkData]:
+        """Legacy fixed-size chunking with sliding window."""
         step = chunk_size - chunk_overlap
         if step <= 0:
             step = 1  # safety: overlap must be less than chunk_size
@@ -296,7 +456,6 @@ class ProcessingService:
             chunk_index += 1
             offset += step
 
-            # If this chunk already reached the end, stop
             if end >= len(full_text):
                 break
 

@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.document import Document
 from app.repositories.chunk_repository import ChunkRepository
 from app.repositories.document_repository import DocumentRepository
@@ -31,12 +32,12 @@ class ExtractionService:
         if not chunks:
             return ""
 
-        # Top 3 chunks (usually Abstract/Intro)
-        edge_chunks = chunks[:3]
+        # Top edge chunks (usually Abstract/Intro)
+        edge_chunks = chunks[:settings.extraction_edge_chunks]
         
-        # Last 3 chunks (usually Conclusion/Limitations)
-        if len(chunks) > 3:
-            edge_chunks.extend(chunks[-3:])
+        # Bottom edge chunks (usually Conclusion/Limitations)
+        if len(chunks) > settings.extraction_edge_chunks:
+            edge_chunks.extend(chunks[-settings.extraction_edge_chunks:])
 
         edge_chunk_ids = {c.id for c in edge_chunks}
 
@@ -49,7 +50,7 @@ class ExtractionService:
                 query=search_query,
                 mode="hybrid",
                 document_id=document.id,
-                limit=5
+                limit=settings.extraction_search_limit,
             )
             semantic_chunks = search_response.results
         except Exception as e:

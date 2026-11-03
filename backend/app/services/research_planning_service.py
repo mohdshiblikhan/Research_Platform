@@ -22,6 +22,7 @@ from app.schemas.research_plan import (
     ResearchPlanResponse,
     ResearchPlanSummary,
 )
+from app.core.config import settings
 from app.services.comparison_service import ComparisonService
 from app.services.llm_service import LLMService
 from app.services.llm_service_factory import get_llm_service
@@ -34,8 +35,6 @@ from app.prompts.research_planning_prompts import (
 )
 
 logger = logging.getLogger(__name__)
-
-MAX_DOCUMENTS_PER_PLAN = 15
 
 
 class ResearchPlanningService:
@@ -74,9 +73,9 @@ class ResearchPlanningService:
             raise ValueError(
                 "At least 2 documents with extractions are required for research planning"
             )
-        if len(docs_with_extractions) > MAX_DOCUMENTS_PER_PLAN:
+        if len(docs_with_extractions) > settings.max_documents_per_plan:
             raise ValueError(
-                f"Planning currently supports a maximum of {MAX_DOCUMENTS_PER_PLAN} documents per plan. "
+                f"Planning currently supports a maximum of {settings.max_documents_per_plan} documents per plan. "
                 f"Please specify a subset using document_ids."
             )
 

@@ -4,6 +4,7 @@ from typing import Optional, Literal
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.search_repository import SearchRepository
@@ -100,7 +101,7 @@ class SearchService:
         
         
         # If reranking, we fetch a larger candidate pool first
-        fetch_limit = 60 if rerank else limit
+        fetch_limit = settings.search_candidate_pool if rerank else limit
         fetch_offset = 0 if rerank else offset
         
         if mode == "keyword":
@@ -176,8 +177,8 @@ class SearchService:
         offset: int,
     ) -> tuple[list[SearchResultItem], int]:
         """Perform Reciprocal Rank Fusion (RRF) on keyword and semantic results."""
-        fusion_k = 60
-        fetch_limit = 60
+        fusion_k = settings.rrf_k
+        fetch_limit = settings.search_candidate_pool
 
         # Fetch from Keyword Search
         keyword_results, keyword_count = self.search_repo.search(
