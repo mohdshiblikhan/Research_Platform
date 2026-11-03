@@ -80,6 +80,24 @@ class ListResearchPlansArgs(BaseModel):
     pass
 
 
+class ListExperimentsArgs(BaseModel):
+    """Arguments for list_experiments tool."""
+    status: Optional[Literal["draft", "planned", "in_progress", "completed", "abandoned"]] = Field(
+        default=None, description="Optional filter by experiment status"
+    )
+    priority: Optional[Literal["high", "medium", "low"]] = Field(
+        default=None, description="Optional filter by priority"
+    )
+    plan_id: Optional[int] = Field(
+        default=None, ge=1, description="Optional filter by originating research plan ID"
+    )
+
+
+class GetExperimentArgs(BaseModel):
+    """Arguments for get_experiment tool."""
+    experiment_id: int = Field(..., ge=1, description="Unique integer ID of the experiment to inspect")
+
+
 # --- API Request & Response Schemas ---
 
 class ToolExecutionRequest(BaseModel):

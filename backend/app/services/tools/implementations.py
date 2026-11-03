@@ -1,6 +1,7 @@
 from typing import Any, Optional
 from app.repositories.chunk_repository import ChunkRepository
 from app.repositories.document_repository import DocumentRepository
+from app.repositories.experiment_repository import ExperimentRepository
 from app.repositories.extraction_repository import ExtractionRepository
 from app.repositories.research_plan_repository import ResearchPlanRepository
 from app.schemas.comparison import ComparisonRequest
@@ -8,9 +9,11 @@ from app.schemas.tool import (
     ComparePapersArgs,
     GetChunkArgs,
     GetDocumentMetadataArgs,
+    GetExperimentArgs,
     GetPaperExtractionArgs,
     GetResearchPlanArgs,
     ListDocumentsArgs,
+    ListExperimentsArgs,
     ListResearchPlansArgs,
     SearchChunksArgs,
     ToolResult,
@@ -410,4 +413,124 @@ class ListResearchPlansTool(BaseTool):
             tool_name=self.name,
             result_summary="\n".join(lines),
             data={"plans": plan_list},
+        )
+
+
+class ListExperimentsTool(BaseTool):
+    name = "list_experiments"
+    description = (
+        "List planned, in-progress, or completed research experiments in the project, "
+        "with optional filtering by status, priority, or research plan ID."
+    )
+    args_schema = ListExperimentsArgs
+    safety_tier = ToolSafetyTier.READ_ONLY
+
+    def run(self, context: ToolContext, **kwargs: Any) -> ToolResult:
+        repo = ExperimentRepository(context.db)
+        experiments = repo.list_by_project(
+            project_id=context.project_id,
+            status=kwargs.get("status"),
+            priority=kwargs.get("priority"),
+            research_plan_id=kwargs.get("plan_id"),
+        )
+        if not experiments:
+            return ToolResult(
+                success=True,
+                tool_name=self.name,
+                result_summary="No experiments found matching the specified criteria in this project.",
+                data={"experiments": []},
+            )
+
+        lines = [f"Found {len(experiments)} experiment(s):"]
+        exp_list = []
+        for e in experiments:
+            has_res = e.has_results
+            lines.append(
+                f"- [ID {e.id}] '{e.title}' | Status: {e.status} | Priority: {e.priority} "
+                f"| Hypothesis: {e.hypothesis_id or 'N/A'} | Has Results: {has_res}"
+            )
+            exp_list.append({
+                "id": e.id,
+                "title": e.title,
+                "status": e.status,
+                "priority": e.priority,
+                "hypothesis_id": e.hypothesis_id,
+                "has_results": has_res,
+                "research_plan_id": e.research_plan_id,
+                "plan_experiment_id": e.plan_experiment_id,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+            })
+        return ToolResult(
+            success=True,
+            tool_name=self.name,
+            result_summary="\n".join(lines),
+            data={"experiments": exp_list},
+        )
+
+
+class GetExperimentTool(BaseTool):
+    name = "get_experiment"
+    description = (
+        "Retrieve the full specifications, methodology, parameters, logged results, "
+        "and qualitative findings of a specific experiment."
+    )
+    args_schema = GetExperimentArgs
+    safety_tier = ToolSafetyTier.READ_ONLY
+
+    def run(self, context: ToolContext, **kwargs: Any) -> ToolResult:
+        repo = ExperimentRepository(context.db)
+        experiment = repo.get_by_id(kwargs["experiment_id"], project_id=context.project_id)
+        if not experiment:
+            return ToolResult(
+                success=False,
+                tool_name=self.name,
+                result_summary=f"Experiment {kwargs['experiment_id']} not found in this project.",
+                error=f"Experiment {kwargs['experiment_id']} not found in project {context.project_id}",
+            )
+
+        summary_lines = [
+            f"Experiment [ID {experiment.id}]: {experiment.title}",
+            f"- Status: {experiment.status} (Priority: {experiment.priority})",
+            f"- Methodology: {experiment.methodology}",
+        ]
+        if experiment.hypothesis_id or experiment.hypothesis_statement:
+            summary_lines.append(
+                f"- Hypothesis: [{experiment.hypothesis_id or 'N/A'}] {experiment.hypothesis_statement or 'N/A'}"
+            )
+        if experiment.datasets:
+            summary_lines.append(f"- Datasets: {experiment.datasets}")
+        if experiment.parameters:
+            summary_lines.append(f"- Parameters: {experiment.parameters}")
+        if experiment.results:
+            summary_lines.append(f"- Results: {experiment.results}")
+        if experiment.findings:
+            findings_summary = experiment.findings.get("summary", "N/A")
+            verdict = experiment.findings.get("hypothesis_verdict", "N/A")
+            summary_lines.append(f"- Findings: {findings_summary} (Verdict: {verdict})")
+
+        return ToolResult(
+            success=True,
+            tool_name=self.name,
+            result_summary="\n".join(summary_lines),
+            data={
+                "id": experiment.id,
+                "project_id": experiment.project_id,
+                "research_plan_id": experiment.research_plan_id,
+                "plan_experiment_id": experiment.plan_experiment_id,
+                "title": experiment.title,
+                "status": experiment.status,
+                "priority": experiment.priority,
+                "hypothesis_id": experiment.hypothesis_id,
+                "hypothesis_statement": experiment.hypothesis_statement,
+                "methodology": experiment.methodology,
+                "datasets": experiment.datasets,
+                "variables": experiment.variables,
+                "parameters": experiment.parameters,
+                "target_metrics": experiment.target_metrics,
+                "results": experiment.results,
+                "findings": experiment.findings,
+                "provenance": experiment.provenance,
+                "abandonment_reason": experiment.abandonment_reason,
+                "completed_at": experiment.completed_at.isoformat() if experiment.completed_at else None,
+            },
         )

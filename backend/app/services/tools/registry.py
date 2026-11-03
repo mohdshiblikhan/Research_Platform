@@ -4,9 +4,11 @@ from app.services.tools.implementations import (
     ComparePapersTool,
     GetChunkTool,
     GetDocumentMetadataTool,
+    GetExperimentTool,
     GetPaperExtractionTool,
     GetResearchPlanTool,
     ListDocumentsTool,
+    ListExperimentsTool,
     ListResearchPlansTool,
     SearchChunksTool,
 )
@@ -48,4 +50,6 @@ def get_default_tool_registry() -> ToolRegistry:
     registry.register(ComparePapersTool())
     registry.register(GetResearchPlanTool())
     registry.register(ListResearchPlansTool())
+    registry.register(ListExperimentsTool())
+    registry.register(GetExperimentTool())
     return registry
