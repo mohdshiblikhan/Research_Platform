@@ -173,10 +173,10 @@ def tools_setup(db_session):
 # ==============================================================================
 
 def test_tool_registry_initialization():
-    """Verify registry initializes with all 8 platform tools and allows lookup."""
+    """Verify registry initializes with all platform tools and allows lookup."""
     registry = get_default_tool_registry()
     tools = registry.get_all_tools()
-    assert len(tools) == 8
+    assert len(tools) == 10
 
     tool_names = [t.name for t in tools]
     expected_names = [
@@ -188,6 +188,8 @@ def test_tool_registry_initialization():
         "compare_papers",
         "get_research_plan",
         "list_research_plans",
+        "list_experiments",
+        "get_experiment",
     ]
     for name in expected_names:
         assert name in tool_names
@@ -417,10 +419,12 @@ def test_api_list_tools(client, db_session, tools_setup):
     response = client.get(f"/api/projects/{p1.id}/tools")
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 8
+    assert len(data) == 10
     names = [t["name"] for t in data]
     assert "search_chunks" in names
     assert "compare_papers" in names
+    assert "list_experiments" in names
+    assert "get_experiment" in names
 
     # 404 for invalid project
     res_404 = client.get("/api/projects/999999/tools")
