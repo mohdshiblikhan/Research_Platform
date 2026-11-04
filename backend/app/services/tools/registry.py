@@ -1,6 +1,7 @@
 from typing import Any, Optional
 from app.services.tools.base import BaseTool
 from app.services.tools.implementations import (
+    CompareExperimentsTool,
     ComparePapersTool,
     GetChunkTool,
     GetDocumentMetadataTool,
@@ -52,4 +53,5 @@ def get_default_tool_registry() -> ToolRegistry:
     registry.register(ListResearchPlansTool())
     registry.register(ListExperimentsTool())
     registry.register(GetExperimentTool())
+    registry.register(CompareExperimentsTool())
     return registry

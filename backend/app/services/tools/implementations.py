@@ -5,7 +5,9 @@ from app.repositories.experiment_repository import ExperimentRepository
 from app.repositories.extraction_repository import ExtractionRepository
 from app.repositories.research_plan_repository import ResearchPlanRepository
 from app.schemas.comparison import ComparisonRequest
+from app.schemas.experiment_comparison import ExperimentComparisonRequest
 from app.schemas.tool import (
+    CompareExperimentsArgs,
     ComparePapersArgs,
     GetChunkArgs,
     GetDocumentMetadataArgs,
@@ -20,6 +22,7 @@ from app.schemas.tool import (
     ToolSafetyTier,
 )
 from app.services.comparison_service import ComparisonService
+from app.services.experiment_comparison_service import ExperimentComparisonService
 from app.services.search_service import SearchService
 from app.services.tools.base import BaseTool, ToolContext
 
@@ -534,3 +537,48 @@ class GetExperimentTool(BaseTool):
                 "completed_at": experiment.completed_at.isoformat() if experiment.completed_at else None,
             },
         )
+
+
+class CompareExperimentsTool(BaseTool):
+    name = "compare_experiments"
+    description = (
+        "Compare 2 to 10 experiments side-by-side across configurations, quantitative metrics, "
+        "baseline deltas, Pareto frontier trade-offs, and hypothesis verdicts."
+    )
+    args_schema = CompareExperimentsArgs
+    safety_tier = ToolSafetyTier.READ_ONLY
+
+    def run(self, context: ToolContext, **kwargs: Any) -> ToolResult:
+        experiment_ids = kwargs.get("experiment_ids", [])
+        if len(experiment_ids) > 10:
+            return ToolResult(
+                success=False,
+                tool_name=self.name,
+                result_summary="Error: compare_experiments tool allows at most 10 experiments per invocation to preserve context budget.",
+                error="Exceeded maximum of 10 experiments for agent comparison.",
+            )
+
+        try:
+            req = ExperimentComparisonRequest(
+                experiment_ids=experiment_ids,
+                baseline_experiment_id=kwargs.get("baseline_experiment_id"),
+                metrics=kwargs.get("metrics"),
+                pareto_objectives=kwargs.get("pareto_objectives"),
+                include_synthesis=kwargs.get("include_synthesis", False),
+            )
+            service = ExperimentComparisonService(context.db)
+            resp = service.compare(context.project_id, req)
+            return ToolResult(
+                success=True,
+                tool_name=self.name,
+                result_summary=resp.export_markdown,
+                data=resp.model_dump(),
+            )
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                tool_name=self.name,
+                result_summary=f"Experiment comparison failed: {str(e)}",
+                error=str(e),
+            )
+

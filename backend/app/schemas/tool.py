@@ -1,6 +1,8 @@
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Tuple
 from pydantic import BaseModel, Field
+
+from app.schemas.experiment_comparison import ParetoObjectiveConfig
 
 
 class ToolSafetyTier(str, Enum):
@@ -96,6 +98,25 @@ class ListExperimentsArgs(BaseModel):
 class GetExperimentArgs(BaseModel):
     """Arguments for get_experiment tool."""
     experiment_id: int = Field(..., ge=1, description="Unique integer ID of the experiment to inspect")
+
+
+class CompareExperimentsArgs(BaseModel):
+    """Arguments for compare_experiments tool."""
+    experiment_ids: list[int] = Field(
+        ..., min_length=2, max_length=10, description="List of 2 to 10 experiment IDs to compare"
+    )
+    baseline_experiment_id: Optional[int] = Field(
+        default=None, description="Optional experiment ID to treat as baseline for deltas"
+    )
+    metrics: Optional[list[str]] = Field(
+        default=None, description="Optional subset of metrics to focus on"
+    )
+    pareto_objectives: Optional[Tuple[ParetoObjectiveConfig, ParetoObjectiveConfig]] = Field(
+        default=None, description="Optional two distinct objectives for Pareto trade-off analysis"
+    )
+    include_synthesis: bool = Field(
+        default=False, description="Whether to include analytical LLM synthesis (defaults to False)"
+    )
 
 
 # --- API Request & Response Schemas ---
