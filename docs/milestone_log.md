@@ -29,7 +29,7 @@
 | 12 | Tool Calling | ✅ Completed | [m12_tool_calling.md](milestones/m12_tool_calling.md) |
 | 13 | Agentic Research Workflow | ✅ Completed | [m13_agentic_research_workflow.md](milestones/m13_agentic_research_workflow.md) |
 | 14 | Experiment Planning & Tracking | ✅ Completed | [m14_experiment_tracking.md](milestones/m14_experiment_tracking.md) |
-| 15 | Experiment Comparison | ⏳ Upcoming | — |
+| 15 | Experiment Comparison | ✅ Completed | [m15_experiment_comparison.md](milestones/m15_experiment_comparison.md) |
 | 16 | AI / RAG / Agent Evaluation | ⏳ Upcoming | — |
 | 17 | Knowledge Graph | ⏳ Upcoming | — |
 | 18 | Productionization | ⏳ Upcoming | — |
@@ -187,6 +187,16 @@
 **What was built**: Introduced a lightweight, domain-agnostic scientific experiment planning and tracking ledger that connects literature research and structured research plans (Milestone 11) with empirical experiment management. Built a dedicated `experiments` table with foreign keys to `projects` (`ON DELETE CASCADE`) and `research_plans` (`ON DELETE SET NULL`). Implemented dual creation workflows: unified batch/selective plan promotion via `POST /api/projects/{p_id}/experiments/promote` and unrestricted manual experiment recording across any initial status (`draft`, `planned`, `in_progress`, `completed`, `abandoned`) via `POST /api/projects/{p_id}/experiments`. Uniformly enforced strict completion outcome validation (requiring non-empty quantitative results OR qualitative findings with a summary, or both) across creation, status updates, and results logging. Implemented contextual provenance verification for gap IDs, document IDs, and hypothesis IDs against actual project data. Built selective results replacement, reopening logic clearing completion timestamps, and registered two secondary read-only agent tools (`list_experiments`, `get_experiment`) for the Milestone 13 research agent. 18 new unit, integration, lifecycle, and tool tests written; 164 total tests passing, 0 regressions.
 
 **Key Architectural Decision**: **Hybrid Relational Core with JSONB Attributes & Domain-Agnostic Outcomes**: Avoided monolithic JSON blobs and rigid tabular schemas by splitting experiment data into indexed, strictly typed relational columns for invariants (`status`, `priority`, `hypothesis_verdict`, timestamps, FKs) alongside validated, open-ended JSONB columns for flexible datasets, variables, hyperparameters, metric results, and qualitative findings. The platform treats quantitative metrics and qualitative findings as independently optional first-class outcomes, supporting exploratory, theoretical, and qualitative research without forcing artificial benchmark metrics or execution engines.
+
+---
+
+### Milestone 15 — Experiment Comparison
+**Version**: `v1.5` | **Migration**: None (App level changes only)  
+**Full Chronicle**: [m15_experiment_comparison.md](milestones/m15_experiment_comparison.md)
+
+**What was built**: Introduced an empirical, deterministic experiment comparison engine and service to compare multiple internally tracked experiments (from Milestone 14) side-by-side. Created `experiment_comparison_engine.py` as a pure, side-effect-free computational module handling metric canonicalization, alias resolution, strict unit normalization (with exact binary vs decimal memory conversions), directional baseline deltas ($\Delta$ and $\%$), parameter divergence tracking with deep JSON equality, 2-objective Pareto frontier trade-off analysis, plan-scoped hypothesis consensus, and markdown report generation. Created `experiment_comparison_service.py` to coordinate database retrieval, clean validation separation (422 Pydantic schema validation vs 400 service business rule validation vs 404 entity resolution), and optional LLM analytical synthesis with resilient failure containment. Added `POST /api/projects/{p_id}/experiments/compare` and `GET /api/projects/{p_id}/experiments/available-metrics` REST endpoints. Added the 11th platform tool (`compare_experiments`) registered in `ToolRegistry` with a 10-experiment safety limit. 26 comprehensive unit, integration, validation, and tool tests written; 190 total tests passing across full suite, 0 regressions.
+
+**Key Architectural Decision**: **Pure Deterministic Engine Decoupling & Strict Metric/Unit Separation**: Completely separated side-effect-free math/comparison logic (`experiment_comparison_engine.py`) from database lookups and LLM generation (`experiment_comparison_service.py`). Canonical metric identities (`latency`) are decoupled from units (`ms`, `s`), with bare metrics lacking required unit metadata marked `incompatible_units` rather than assuming default units. Pareto analysis is strictly opt-in and restricted to two distinct objectives with explicit directions to prevent dominance ambiguity. If the optional LLM synthesis layer fails or times out, the service preserves the complete deterministic matrix and returns `synthesis_status: "failed"` without disrupting user analysis.
 
 ---
 
