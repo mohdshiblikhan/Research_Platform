@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     # Research Planning configuration (Milestone 10)
     max_documents_per_plan: int = 15        # Max literature extractions allowed per planning run
 
+    # Experiment Comparison configuration (Milestone 15)
+    max_experiments_per_comparison: int = 20  # Max experiments compared via API
+    max_experiments_agent: int = 10           # Max experiments compared via Agent Tool
+
     model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()
