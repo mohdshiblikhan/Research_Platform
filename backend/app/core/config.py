@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     max_experiments_per_comparison: int = 20  # Max experiments compared via API
     max_experiments_agent: int = 10           # Max experiments compared via Agent Tool
 
+    # Evaluation configuration (Milestone 16)
+    eval_default_k_values: list[int] = [1, 3, 5, 10]
+    eval_judge_temperature: float = 0.0          # Deterministic 0.0 for LLM judges
+    eval_max_synthetic_samples: int = 50         # Max items generated in single batch
+    eval_claim_extraction_max_tokens: int = 1000
+
     model_config = SettingsConfigDict(env_file=".env")
 
 settings = Settings()
