@@ -119,6 +119,38 @@ class CompareExperimentsArgs(BaseModel):
     )
 
 
+class RunEvaluationArgs(BaseModel):
+    """Arguments for run_evaluation tool."""
+    dataset_id: int = Field(..., ge=1, description="Evaluation dataset ID to evaluate against")
+    eval_type: Literal["retrieval", "rag", "agent"] = Field(
+        ..., description="Evaluation target: retrieval, rag, or agent"
+    )
+    name: str = Field(..., min_length=1, max_length=255, description="Name for this evaluation run")
+    search_mode: Literal["keyword", "semantic", "hybrid"] = Field(
+        default="hybrid", description="Search mode for retrieval or rag evaluation"
+    )
+    rerank: bool = Field(default=False, description="Whether to apply reranking for retrieval/rag")
+    k_values: list[int] = Field(
+        default_factory=lambda: [1, 3, 5, 10], description="K values for retrieval metrics"
+    )
+    top_k: int = Field(default=5, ge=1, description="Top-K context passages for RAG evaluation")
+    max_iterations: int = Field(default=10, ge=1, description="Max iterations for agent evaluation")
+    validated_only: bool = Field(
+        default=True, description="Whether to evaluate only human/manually-validated items (default True)"
+    )
+    create_experiment: bool = Field(
+        default=True, description="Whether to log this evaluation run to the experiment tracker"
+    )
+
+
+class GetEvaluationResultsArgs(BaseModel):
+    """Arguments for get_evaluation_results tool."""
+    run_id: int = Field(..., ge=1, description="Unique primary key of the evaluation run to inspect")
+    include_item_results: bool = Field(
+        default=False, description="Whether to include detailed per-item evaluation records"
+    )
+
+
 # --- API Request & Response Schemas ---
 
 class ToolExecutionRequest(BaseModel):

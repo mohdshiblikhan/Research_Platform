@@ -11,15 +11,22 @@ from app.schemas.tool import (
     ComparePapersArgs,
     GetChunkArgs,
     GetDocumentMetadataArgs,
+    GetEvaluationResultsArgs,
     GetExperimentArgs,
     GetPaperExtractionArgs,
     GetResearchPlanArgs,
     ListDocumentsArgs,
     ListExperimentsArgs,
     ListResearchPlansArgs,
+    RunEvaluationArgs,
     SearchChunksArgs,
     ToolResult,
     ToolSafetyTier,
+)
+from app.schemas.evaluation import (
+    RunAgentEvaluationRequest,
+    RunRAGEvaluationRequest,
+    RunRetrievalEvaluationRequest,
 )
 from app.services.comparison_service import ComparisonService
 from app.services.experiment_comparison_service import ExperimentComparisonService
@@ -581,4 +588,176 @@ class CompareExperimentsTool(BaseTool):
                 result_summary=f"Experiment comparison failed: {str(e)}",
                 error=str(e),
             )
+
+
+class RunEvaluationTool(BaseTool):
+    name = "run_evaluation"
+    description = (
+        "Execute an automated evaluation benchmark (retrieval, rag, or agent) across a dataset. "
+        "Evaluates retrieval quality (Recall@K, MRR@K, nDCG@K), RAG faithfulness & citation support, "
+        "or agent trajectory metrics and logs results to the experiment tracker."
+    )
+    args_schema = RunEvaluationArgs
+    safety_tier = ToolSafetyTier.ANALYTICAL
+
+    def run(self, context: ToolContext, **kwargs: Any) -> ToolResult:
+        from app.services.evaluation_service import EvaluationService
+        eval_type = kwargs.get("eval_type")
+        dataset_id = kwargs.get("dataset_id")
+        name = kwargs.get("name")
+
+        service = EvaluationService(context.db)
+
+        try:
+            if eval_type == "retrieval":
+                req = RunRetrievalEvaluationRequest(
+                    dataset_id=dataset_id,
+                    name=name,
+                    search_mode=kwargs.get("search_mode", "hybrid"),
+                    rerank=kwargs.get("rerank", False),
+                    k_values=kwargs.get("k_values", [1, 3, 5, 10]),
+                    validated_only=kwargs.get("validated_only", True),
+                    create_experiment=kwargs.get("create_experiment", True),
+                )
+                run = service.run_retrieval_evaluation(context.project_id, req)
+            elif eval_type == "rag":
+                req = RunRAGEvaluationRequest(
+                    dataset_id=dataset_id,
+                    name=name,
+                    search_mode=kwargs.get("search_mode", "hybrid"),
+                    rerank=kwargs.get("rerank", True),
+                    top_k=kwargs.get("top_k", 5),
+                    validated_only=kwargs.get("validated_only", True),
+                    create_experiment=kwargs.get("create_experiment", True),
+                )
+                run = service.run_rag_evaluation(context.project_id, req)
+            elif eval_type == "agent":
+                req = RunAgentEvaluationRequest(
+                    dataset_id=dataset_id,
+                    name=name,
+                    max_iterations=kwargs.get("max_iterations", 10),
+                    validated_only=kwargs.get("validated_only", True),
+                    create_experiment=kwargs.get("create_experiment", True),
+                )
+                run = service.run_agent_evaluation(context.project_id, req)
+            else:
+                return ToolResult(
+                    success=False,
+                    tool_name=self.name,
+                    result_summary=f"Invalid eval_type: '{eval_type}'. Must be 'retrieval', 'rag', or 'agent'.",
+                    error="Invalid eval_type",
+                )
+
+            summary_lines = [
+                f"Evaluation Run {run.id} ('{run.name}') completed.",
+                f"- Type: {run.eval_type}",
+                f"- Status: {run.status}",
+                f"- Items evaluated: {run.completed_items}/{run.total_items}",
+                f"- Duration: {run.duration_ms:.1f}ms",
+            ]
+            if run.experiment_id:
+                summary_lines.append(f"- Experiment ID: {run.experiment_id}")
+            if run.summary_metrics:
+                summary_lines.append("- Key Summary Metrics:")
+                for k, v in list(run.summary_metrics.items())[:6]:
+                    val_str = f"{v:.4f}" if isinstance(v, float) else str(v)
+                    summary_lines.append(f"  * {k}: {val_str}")
+
+            return ToolResult(
+                success=True,
+                tool_name=self.name,
+                result_summary="\n".join(summary_lines),
+                data={
+                    "run_id": run.id,
+                    "project_id": run.project_id,
+                    "dataset_id": run.dataset_id,
+                    "experiment_id": run.experiment_id,
+                    "name": run.name,
+                    "eval_type": run.eval_type,
+                    "status": run.status,
+                    "completed_items": run.completed_items,
+                    "total_items": run.total_items,
+                    "duration_ms": run.duration_ms,
+                    "summary_metrics": run.summary_metrics,
+                },
+            )
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                tool_name=self.name,
+                result_summary=f"Evaluation run failed: {str(e)}",
+                error=str(e),
+            )
+
+
+class GetEvaluationResultsTool(BaseTool):
+    name = "get_evaluation_results"
+    description = (
+        "Retrieve summary metrics, status, execution configuration, and optional item results "
+        "for a specific evaluation run."
+    )
+    args_schema = GetEvaluationResultsArgs
+    safety_tier = ToolSafetyTier.READ_ONLY
+
+    def run(self, context: ToolContext, **kwargs: Any) -> ToolResult:
+        from app.services.evaluation_service import EvaluationService
+        run_id = kwargs.get("run_id")
+        include_items = kwargs.get("include_item_results", False)
+
+        service = EvaluationService(context.db)
+        try:
+            run = service.get_run(context.project_id, run_id)
+            lines = [
+                f"### Evaluation Run {run.id}: {run.name}",
+                f"- **Type:** {run.eval_type}",
+                f"- **Status:** {run.status}",
+                f"- **Items:** {run.completed_items}/{run.total_items}",
+                f"- **Duration:** {run.duration_ms:.1f}ms",
+            ]
+            if run.experiment_id:
+                lines.append(f"- **Linked Experiment:** {run.experiment_id}")
+            if run.summary_metrics:
+                lines.append("- **Summary Metrics:**")
+                for k, v in run.summary_metrics.items():
+                    val_str = f"{v:.4f}" if isinstance(v, float) else str(v)
+                    lines.append(f"  - `{k}`: {val_str}")
+
+            item_data = []
+            if include_items:
+                results = service.get_run_item_results(context.project_id, run_id, limit=20)
+                lines.append(f"\n- **Sample Item Results (first {len(results)}):**")
+                for r in results:
+                    lines.append(f"  - Q: \"{r.query[:60]}...\" | Metrics: {r.metrics}")
+                    item_data.append({
+                        "id": r.id,
+                        "query": r.query,
+                        "metrics": r.metrics,
+                        "duration_ms": r.duration_ms,
+                    })
+
+            return ToolResult(
+                success=True,
+                tool_name=self.name,
+                result_summary="\n".join(lines),
+                data={
+                    "run_id": run.id,
+                    "name": run.name,
+                    "eval_type": run.eval_type,
+                    "status": run.status,
+                    "summary_metrics": run.summary_metrics,
+                    "system_configuration": run.system_configuration,
+                    "dataset_snapshot": run.dataset_snapshot,
+                    "experiment_id": run.experiment_id,
+                    "duration_ms": run.duration_ms,
+                    "item_results": item_data if include_items else None,
+                },
+            )
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                tool_name=self.name,
+                result_summary=f"Failed to fetch evaluation results for run {run_id}: {str(e)}",
+                error=str(e),
+            )
+
 
