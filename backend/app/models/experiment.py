@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base_class import Base
 
 if TYPE_CHECKING:
+    from app.models.evaluation import EvaluationRun
     from app.models.project import Project
     from app.models.research_plan import ResearchPlan
 
@@ -94,6 +95,7 @@ class Experiment(Base):
     # --- Relationships ---
     project: Mapped["Project"] = relationship(back_populates="experiments")
     research_plan: Mapped[Optional["ResearchPlan"]] = relationship(back_populates="experiments")
+    evaluation_runs: Mapped[list["EvaluationRun"]] = relationship(back_populates="experiment")
 
     __table_args__ = (
         Index("ix_experiments_project_status", "project_id", "status"),

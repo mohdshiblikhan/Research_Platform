@@ -13,6 +13,12 @@ from app.models.experiment import (
     ExperimentStatus,
     HypothesisVerdict,
 )
+from app.models.evaluation import (
+    EvaluationDataset,
+    EvaluationDatasetItem,
+    EvaluationRun,
+    EvaluationItemResult,
+)
 
 __all__ = [
     "Base",
@@ -26,4 +32,8 @@ __all__ = [
     "ExperimentStatus",
     "ExperimentPriority",
     "HypothesisVerdict",
+    "EvaluationDataset",
+    "EvaluationDatasetItem",
+    "EvaluationRun",
+    "EvaluationItemResult",
 ]
