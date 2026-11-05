@@ -13,6 +13,7 @@ from app.api.endpoints import (
     agent,
     experiments,
     experiment_comparison,
+    evaluation,
 )
 
 router = APIRouter()
@@ -29,3 +30,4 @@ router.include_router(tools.router)
 router.include_router(agent.router)
 router.include_router(experiments.router)
 router.include_router(experiment_comparison.router)
+router.include_router(evaluation.router)
